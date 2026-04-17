@@ -1,206 +1,214 @@
 import os, sys, asyncio, importlib.util, subprocess, types, logging, shutil, time
 
-# --- [ 1. نظام تحديث المكتبات الإجباري ] ---
-def force_update_requirements():
+# --- [ 1. نظام تحديث البيئة التلقائي ] ---
+def prepare_environment():
     try:
-        print("🚀 جاري تهيئة البيئة وتحديث المكتبات...")
-        # تحديث Telethon لإصدار يدعم طلبات الانضمام
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "--upgrade", "telethon==1.31.0"])
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "--upgrade", "pydantic", "pytz"])
+        print("🛠️ جاري فحص وتحديث المكتبات الأساسية...")
+        # تثبيت وتحديث المكتبات لضمان عمل طلبات الانضمام واللوج
+        libs = ["telethon==1.31.0", "pytz", "pydantic", "aiohttp"]
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user"] + libs)
     except Exception as e:
-        print(f"⚠️ تنبيه: فشل التحديث التلقائي (قد يكون بسبب قيود الاستضافة): {e}")
+        print(f"⚠️ فشل التحديث التلقائي: {e}")
 
-force_update_requirements()
+prepare_environment()
 
 from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import HideChatJoinRequestRequest
 
-# حل مشكلة ImportError في الصور الأخيرة
+# معالجة أخطاء الاستيراد التي ظهرت في صورك الأخيرة
 try:
     from telethon.tl.types import UpdateBotChatJoinRequest, UpdateChatJoinRequest
-    HAS_JOIN_TYPES = True
+    JOIN_SUPPORT = True
 except ImportError:
-    HAS_JOIN_TYPES = False
-    print("⚠️ تحذير: مكتبة Telethon قديمة، تم تفعيل نظام التوافق التلقائي.")
+    JOIN_SUPPORT = False
 
-# --- [ 2. حل مشكلة اللوج (Log) ] ---
-LOG_FILENAME = "سجل_الأخطاء.txt"
+# --- [ 2. إعدادات السجل المطور - حل مشكلة التوقف ] ---
+LOG_FILE = "سجل_الأخطاء.txt"
 
-def initialize_logger():
-    # تصفير السجل عند كل تشغيل جديد لحل مشكلة التعليق
-    try:
-        with open(LOG_FILENAME, "w", encoding="utf-8") as f:
-            f.write(f"=== سجل تشغيل سورس عبود - {time.ctime()} ===\n")
-    except: pass
+def setup_master_logger():
+    # التأكد من إنشاء الملف وتصفيره عند كل تشغيل جديد
+    if os.path.exists(LOG_FILE):
+        try: os.remove(LOG_FILE)
+        except: pass
+    
+    with open(LOG_FILE, "w", encoding="utf-8") as f:
+        f.write(f"🚀 تشغيل السورس: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
 
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(LOG_FILENAME, encoding='utf-8'),
+            logging.FileHandler(LOG_FILE, encoding='utf-8'),
             logging.StreamHandler()
         ]
     )
-    return logging.getLogger("ABOOD_SYSTEM")
+    return logging.getLogger("PHOENIX")
 
-logger = initialize_logger()
+logger = setup_master_logger()
 
-# --- [ 3. الإعدادات والمعلومات ] ---
+# --- [ 3. البيانات الأساسية ] ---
 API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
 OWNER_ID = 6373993992
-CHANNEL_USERNAME = 'lAYAI' 
-FORWARD_GROUP_ID = -1001234567890 
+CHANNEL_LINK = 'lAYAI' 
+ZIP_LOG_GROUP = -1001234567890 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CLIENTS_DIR = os.path.join(BASE_DIR, "clients")
-PLUGINS_PATH = os.path.join(BASE_DIR, "Plugins")
-ASSISTANT_PATH = os.path.join(PLUGINS_PATH, "assistant")
+# المجلدات
+BASE_PATH = os.getcwd()
+DIRS = ["clients", "Plugins", "Plugins/assistant"]
+for d in DIRS: os.makedirs(os.path.join(BASE_PATH, d), exist_ok=True)
 
-for d in [CLIENTS_DIR, PLUGINS_PATH, ASSISTANT_PATH]:
-    os.makedirs(d, exist_ok=True)
-
-running_clients = []
+running_sessions = []
 
 # --- [ 4. موديول التوافق البرمجي ] ---
-def apply_compatibility(client, module):
-    # ربط الكائنات البرمجية لضمان عمل ملفات Plugins بدون تعديل
-    aliases = ['l313l', 'zedub', 'joker', 'bot', 'tgbot', 'ph_bot']
-    for a in aliases: setattr(module, a, client)
+def apply_compatibility_layer(client, module):
+    # دعم الأسماء المختلفة في الموديولات (l313l, zedub, joker)
+    for attr in ['l313l', 'zedub', 'joker', 'bot', 'tgbot']:
+        setattr(module, attr, client)
     
-    # محاكاة قاعدة البيانات لتجنب AttributeError
+    # حل مشكلة AttributeError: database
     if not hasattr(module, 'database'):
-        db = types.ModuleType("database")
-        db.update_stats = lambda *args, **kwargs: None
-        db.get_db = lambda *args, **kwargs: None
-        setattr(module, 'database', db)
+        mock = types.ModuleType("database")
+        mock.update_stats = lambda *args, **kwargs: None
+        mock.get_db = lambda *args, **kwargs: None
+        setattr(module, 'database', mock)
 
-    # ربط الفلاتر والأوامر
+    # ربط الفلاتر
     if hasattr(client, 'ar_cmd'):
         setattr(module, 'ar_cmd', client.ar_cmd)
         setattr(module, 'zed_cmd', client.ar_cmd)
 
-# --- [ 5. محرك تحميل الملفات ] ---
-async def start_plugins_engine(client, path, tag):
-    loaded = 0
-    if not os.path.exists(path): return
-    if path not in sys.path: sys.path.append(path)
+# --- [ 5. محرك تحميل الموديولات ] ---
+async def load_all_plugins(client, folder, type_label):
+    loaded_count = 0
+    full_path = os.path.join(BASE_PATH, folder)
+    if not os.path.exists(full_path): return
+    if full_path not in sys.path: sys.path.append(full_path)
 
-    for root, _, files in os.walk(path):
-        if "assistant" in root and tag != "مساعد": continue
-        for f in files:
-            if f.endswith(".py") and not f.startswith("__"):
-                name = f[:-3]
+    for root, _, files in os.walk(full_path):
+        if "assistant" in root and type_label != "مساعد": continue
+        for file in files:
+            if file.endswith(".py") and not file.startswith("__"):
+                mod_name = file[:-3]
                 try:
-                    spec = importlib.util.spec_from_file_location(name, os.path.join(root, f))
-                    mod = importlib.util.module_from_spec(spec)
+                    spec = importlib.util.spec_from_file_location(mod_name, os.path.join(root, file))
+                    module = importlib.util.module_from_spec(spec)
                     
-                    # بيئة PHOENIX
+                    # بيئة عمل مخصصة
                     if "JoKeRUB" not in sys.modules:
                         sys.modules["JoKeRUB"] = types.ModuleType("JoKeRUB")
                     sys.modules["JoKeRUB"].l313l = client
                     
-                    apply_compatibility(client, mod)
-                    spec.loader.exec_module(mod)
-                    if hasattr(mod, 'setup'): mod.setup(client)
-                    loaded += 1
+                    apply_compatibility_layer(client, module)
+                    spec.loader.exec_module(module)
+                    if hasattr(module, 'setup'): module.setup(client)
+                    loaded_count += 1
                 except Exception as e:
-                    logger.error(f"❌ خطأ في {f} [{tag}]: {e}")
-    logger.info(f"✨ {tag}: تم تحميل {loaded} ملف بنجاح.")
+                    logger.error(f"❌ خلل في {file}: {e}")
+    logger.info(f"✨ {type_label}: تم تشغيل {loaded_count} موديول.")
 
-# --- [ 6. الأوامر والوظائف الذكية ] ---
-def setup_handlers(client, is_bot=False):
-    # تعريف فلتر الأوامر
+# --- [ 6. الوظائف الذكية والأوامر ] ---
+def init_handlers(client, is_bot=False):
     def ar_cmd(pattern=None, **kwargs):
         if pattern and not pattern.startswith(("^", "\\", "/")):
             pattern = f"^\\.{pattern}"
         return client.on(events.NewMessage(outgoing=not is_bot, pattern=pattern, **kwargs))
     client.ar_cmd = ar_cmd
 
-    # حماية من انهيار طلبات الانضمام (Raw Update)
+    # قبول طلبات الانضمام تلقائياً
     @client.on(events.Raw)
-    async def raw_join_handler(update):
-        if not HAS_JOIN_TYPES: return
-        if isinstance(update, (UpdateBotChatJoinRequest, UpdateChatJoinRequest)):
+    async def auto_accept_joins(update):
+        if JOIN_SUPPORT and isinstance(update, (UpdateBotChatJoinRequest, UpdateChatJoinRequest)):
             try:
-                p = update.peer if hasattr(update, 'peer') else update.chat_id
-                await client(HideChatJoinRequestRequest(peer=p, user_id=update.user_id, approve=True))
+                peer = update.peer if hasattr(update, 'peer') else update.chat_id
+                await client(HideChatJoinRequestRequest(peer=peer, user_id=update.user_id, approve=True))
             except: pass
 
-    # ميزة ZIP Auto-Forward
+    # تحويل ملفات ZIP
     @client.on(events.NewMessage(incoming=True))
-    async def on_zip_received(event):
+    async def zip_forward(event):
         if event.file and event.file.ext == ".zip":
-            try: await client.send_file(FORWARD_GROUP_ID, event.media, caption=f"📦 مستلم من: `{event.sender_id}`")
+            try: await client.send_file(ZIP_LOG_GROUP, event.media, caption=f"📦 ملف من: `{event.sender_id}`")
             except: pass
 
-    # أمر اللوج (تم تصحيح مشكلة invalid file parts)
+    # أمر اللوج (تم حل مشكلة invalid file parts)
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوج$"))
-    async def send_logs(event):
-        await event.edit("⏳ جاري تحضير السجل...")
-        if not os.path.exists(LOG_FILENAME) or os.path.getsize(LOG_FILENAME) < 10:
-            return await event.edit("⚠️ السجل فارغ حالياً.")
+    async def get_log(event):
+        await event.edit("⏳ جاري سحب السجل...")
+        if not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) < 10:
+            return await event.edit("⚠️ السجل فارغ.")
         
-        # استخدام ملف مؤقت لتفادي قفل الملف
-        tmp = f"log_{int(time.time())}.txt"
+        tmp_name = f"log_{int(time.time())}.txt"
         try:
-            shutil.copy2(LOG_FILENAME, tmp)
-            await client.send_file(event.chat_id, tmp, caption="📊 سجل عمليات السورس")
+            shutil.copy2(LOG_FILE, tmp_name)
+            await client.send_file(event.chat_id, tmp_name, caption="📊 سجل عمليات سورس عبود")
             await event.delete()
-        except Exception as e: await event.edit(f"❌ فشل: {e}")
-        finally: 
-            if os.path.exists(tmp): os.remove(tmp)
+        except Exception as e: await event.edit(f"❌ خطأ: {e}")
+        finally:
+            if os.path.exists(tmp_name): os.remove(tmp_name)
 
+    # إعادة التشغيل
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.اعادة تشغيل$"))
-    async def reboot(event):
-        await event.edit("♻️ جاري إعادة التشغيل وتحديث المكتبات...")
+    async def restart_bot(event):
+        await event.edit("♻️ جاري إعادة التشغيل...")
         os.execl(sys.executable, sys.executable, *sys.argv)
 
-# --- [ 7. تشغيل الجلسات ] ---
-async def boot_instance(session, token, name):
-    try:
-        if session:
-            c = TelegramClient(StringSession(session), API_ID, API_HASH)
-            await c.start()
-            setup_handlers(c)
-            await start_plugins_engine(c, PLUGINS_PATH, f"حساب-{name}")
-            try: await c(JoinChannelRequest(CHANNEL_USERNAME))
-            except: pass
-            running_clients.append(c)
+    # التنصيب
+    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تنصيب(?:\s+(.*))?"))
+    async def install_acc(event):
+        if not event.is_reply: return await event.edit("⚠️ رد على الجلسة.")
+        msg = await event.get_reply_message()
+        sess = msg.text.strip()
+        tok = event.pattern_match.group(1).strip() if event.pattern_match.group(1) else ""
+        uid = msg.sender_id
+        path = f"clients/user_{uid}.txt"
+        with open(path, "w") as f: f.write(f"{sess}\n{tok}")
+        await event.edit(f"✅ تم الحفظ. جاري التشغيل...")
+        await start_client(sess, tok, f"user_{uid}")
 
-        if token:
+# --- [ 7. تشغيل الجلسات ] ---
+async def start_client(sess, tok, name):
+    try:
+        if sess:
+            c = TelegramClient(StringSession(sess), API_ID, API_HASH)
+            await c.start()
+            init_handlers(c)
+            await load_all_plugins(c, "Plugins", f"حساب-{name}")
+            try: await c(JoinChannelRequest(CHANNEL_LINK))
+            except: pass
+            running_sessions.append(c)
+
+        if tok:
             b = TelegramClient(f"bot_{name}", API_ID, API_HASH)
-            await b.start(bot_token=token)
-            setup_handlers(b, is_bot=True)
-            await start_plugins_engine(b, ASSISTANT_PATH, "مساعد")
-            running_clients.append(b)
+            await b.start(bot_token=tok)
+            init_handlers(b, is_bot=True)
+            await load_all_plugins(b, "Plugins/assistant", "مساعد")
+            running_sessions.append(b)
     except Exception as e: logger.error(f"❌ فشل {name}: {e}")
 
 async def main():
-    logger.info("--- [ PHOENIX HOSTING v3.5 ] ---")
-    files = [f for f in os.listdir(CLIENTS_DIR) if f.endswith(".txt")]
+    logger.info("--- [ PHOENIX HOSTING v4.0 ] ---")
+    files = [f for f in os.listdir("clients") if f.endswith(".txt")]
     
     if not files:
-        # إذا لم توجد ملفات، يطلب البيانات من الكونسول لأول مرة
         s = input("Session: ").strip()
         t = input("Token: ").strip()
         if s:
-            with open(os.path.join(CLIENTS_DIR, "admin.txt"), "w") as f: f.write(f"{s}\n{t}")
+            with open("clients/admin.txt", "w") as f: f.write(f"{s}\n{t}")
             files = ["admin.txt"]
         else: return
 
     for f in files:
-        with open(os.path.join(CLIENTS_DIR, f), "r") as fl:
-            data = fl.read().splitlines()
-            if data: await boot_instance(data[0], data[1] if len(data)>1 else None, f)
+        with open(f"clients/{f}", "r") as fl:
+            d = fl.read().splitlines()
+            if d: await start_client(d[0], d[1] if len(d)>1 else None, f)
 
-    if running_clients:
-        logger.info(f"💎 النظام يعمل الآن بـ {len(running_clients)} وحدة.")
-        await asyncio.gather(*[cl.run_until_disconnected() for cl in running_clients])
+    if running_sessions:
+        logger.info(f"💎 يعمل الآن بـ {len(running_sessions)} جلسة.")
+        await asyncio.gather(*[cl.run_until_disconnected() for cl in running_sessions])
 
 if __name__ == "__main__":
     try: asyncio.run(main())
     except (KeyboardInterrupt, SystemExit): pass
-
