@@ -2,20 +2,17 @@
 cryptg
 tgcrypto
 uvloop; sys_platform != 'win32'
-
 # --- Task Scheduling ---
 apscheduler
-
 # --- System & Utilities ---
 colorama
 pydantic
 speedtest-cli
 gdown
-
 # --- Database Extension ---
+sqlalchemy
 sqlalchemy-utils
-
-# --- Base ---
+# --- Base & Features ---
 telethon
 Pillow
 requests
@@ -23,3 +20,8 @@ GitPython
 pyrogram
 pytz
 aiohttp
+python-telegram-bot
+phonenumbers
+hachoir
+beautifulsoup4
+async-generator
