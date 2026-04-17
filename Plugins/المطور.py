@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # Plugins/المطور.py
-# أمر .المطور يرسل رسالة المطور مع أزرار ملونة
+# أمر .المطور - يستخدم Inline Mode لإرسال رسالة المطور
 
 from telethon import events
 
-# ضع يوزر البوت المساعد هنا (بدون @)
+# غيّر إلى يوزر بوتك المساعد (بدون @)
 BOT_USERNAME = "xxscnbot"
 
 def setup(client):
@@ -16,6 +16,6 @@ def setup(client):
                 await results[0].click(event.chat_id, reply_to=event.reply_to_msg_id)
                 await event.delete()
             else:
-                await event.edit("❌ لم يتم العثور على نتائج.")
+                await event.edit("❌ لم يتم العثور على نتائج. تأكد من أن البوت يعمل.")
         except Exception as e:
             await event.edit(f"❌ حدث خطأ: {e}")
