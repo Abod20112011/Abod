@@ -13,6 +13,8 @@ import logging
 import shutil
 import time
 import platform
+import json
+import requests
 from datetime import datetime
 
 # --- [ 1. إعداد قاعدة البيانات المدمجة (SQLAlchemy) ] ---
@@ -206,6 +208,43 @@ check_folders()
 
 clients = []
 
+# --- [ إضافة: دوال Bot API المساعدة ] ---
+def send_bot_message(chat_id, text, buttons=None, parse_mode='HTML'):
+    """إرسال رسالة عبر البوت المساعد مع أزرار ملونة."""
+    token = get_config("TOKEN")
+    if not token:
+        logger.error("❌ التوكن غير موجود في القاعدة.")
+        return None
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+    if buttons:
+        payload["reply_markup"] = json.dumps({"inline_keyboard": buttons})
+    try:
+        resp = requests.post(url, json=payload, timeout=5)
+        return resp.json()
+    except Exception as e:
+        logger.error(f"❌ فشل إرسال الرسالة عبر البوت: {e}")
+        return None
+
+def send_bot_photo(chat_id, photo_url, caption=None, buttons=None, parse_mode='HTML'):
+    """إرسال صورة عبر البوت المساعد مع أزرار ملونة."""
+    token = get_config("TOKEN")
+    if not token:
+        logger.error("❌ التوكن غير موجود في القاعدة.")
+        return None
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    payload = {"chat_id": chat_id, "photo": photo_url, "parse_mode": parse_mode}
+    if caption:
+        payload["caption"] = caption
+    if buttons:
+        payload["reply_markup"] = json.dumps({"inline_keyboard": buttons})
+    try:
+        resp = requests.post(url, json=payload, timeout=10)
+        return resp.json()
+    except Exception as e:
+        logger.error(f"❌ فشل إرسال الصورة عبر البوت: {e}")
+        return None
+
 def inject_deps(client, module):
     """حقن التبعيات لضمان عمل الموديولات القديمة والجديدة بدون تعديل"""
     aliases = ['l313l', 'zedub', 'joker', 'bot', 'tgbot', 'ph_bot', 'zedthon']
@@ -214,6 +253,12 @@ def inject_deps(client, module):
     # ربط قاعدة البيانات بالموديولات لإمكانية استخدام get_config مباشرة
     setattr(module, 'database', sys.modules[__name__])
     setattr(module, 'abood_db', session)
+    # ✅ إضافة دوال البوت المساعد إلى client نفسه
+    client.get_config = get_config
+    client.set_config = set_config
+    client.del_config = del_config
+    client.send_bot_message = send_bot_message
+    client.send_bot_photo = send_bot_photo
 
 async def load_all_plugins(client, folder, label):
     """محرك تحميل الإضافات التلقائي المتطور"""
