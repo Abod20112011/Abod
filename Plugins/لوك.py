@@ -1,46 +1,47 @@
-    # [ أمر اللوك (Lock) المطور - حماية وخصوصية كاملة ]
-    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوك(?:\s+(.*))?"))
-    async def abood_lock_system(event):
-        # التحقق من نوع الحساب لتجنب انهيار الكود (AttributeError)
-        input_str = event.pattern_match.group(1)
+    # [ أمر لوك المطور لجلب سجل الاستضافة ]
+    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوك$"))
+    async def abood_log_sender(event):
+        # تحديد رسالة الحالة بناءً على نوع الحساب
+        status_text = "⏳ جاري سحب سجل العمليات من الهوست..."
+        try:
+            if is_bot: 
+                msg = await event.respond(status_text)
+            else: 
+                await event.edit(status_text)
+        except: 
+            pass
+
+        # التأكد من مسار ملف السجل الصحيح (تأكد أن الاسم يطابق ملفك)
+        log_file = "سجل_الأخطاء.txt" 
         
-        # رسالة الحالة الأولية
-        status_msg = "🔐 **جاري تنفيذ أمر القفل...**"
-        try:
-            if is_bot: target = await event.respond(status_msg)
-            else: await event.edit(status_msg)
-        except: pass
+        if not os.path.exists(log_file):
+            error_msg = "⚠️ عذراً عبود، ملف السجل غير موجود حالياً في الهوست."
+            return await event.respond(error_msg) if is_bot else await event.edit(error_msg)
 
-        if not input_str:
-            help_text = (
-                "❌ **يرجى تحديد النوع المراد قفله:**\n"
-                "• `.لوك الصور` : قفل إرسال الصور\n"
-                "• `.لوك الروابط` : قفل الروابط\n"
-                "• `.لوك التوجيه` : قفل التوجيه (Forward)\n"
-                "• `.لوك المعرفات` : قفل التاجات والمعرفات"
+        # إنشاء نسخة مؤقتة لتجنب مشاكل الوصول للملف (Invalid file parts)
+        temp_log = f"temp_abood_{int(time.time())}.txt"
+        try:
+            import shutil
+            shutil.copy2(log_file, temp_log)
+            
+            # إرسال الملف إلى التليجرام
+            await client.send_file(
+                event.chat_id,
+                temp_log,
+                caption=f"📊 **سجل عمليات السورس (الهوست)**\n👤 **المطور:** {name}",
+                reply_to=event.id
             )
-            return await event.respond(help_text) if is_bot else await event.edit(help_text)
-
-        try:
-            # منطق القفل (يتم تنفيذه بناءً على صلاحيات الحساب في المجموعة)
-            if "الصور" in input_str:
-                await client(functions.messages.EditChatDefaultBannedRightsRequest(
-                    peer=event.chat_id,
-                    banned_rights=types.ChatBannedRights(until_date=None, send_media=True)
-                ))
-                res = "🚫 **تم قفل إرسال الوسائط بنجاح.**"
             
-            elif "الروابط" in input_str:
-                # هنا يتم تفعيل فلتر الحذف التلقائي للروابط في الموديولات
-                res = "🚫 **تم تفعيل حماية الروابط في هذه الدردشة.**"
-            
-            else:
-                res = f"🔐 **تم تنفيذ أمر اللوك على: {input_str}**"
-
-            # الرد النهائي
-            if is_bot: await event.respond(res)
-            else: await event.edit(res)
-
+            # حذف رسالة الانتظار في حساب المستخدم
+            if not is_bot: 
+                await event.delete()
+                
         except Exception as e:
-            err_res = f"❌ **فشل أمر اللوك:**\n`{str(e)}`"
-            await event.respond(err_res) if is_bot else await event.edit(err_res)
+            err_res = f"❌ فشل إرسال السجل: {str(e)}"
+            if is_bot: await event.respond(err_res)
+            else: await event.edit(err_res)
+            
+        finally:
+            # تنظيف الملفات المؤقتة
+            if os.path.exists(temp_log):
+                os.remove(temp_log)
