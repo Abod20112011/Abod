@@ -1,62 +1,54 @@
+import os
+import time
+import shutil
 from telethon import events
-import database as db
 
-# --- معالج حذف رسائل المكتومين ---
-@events.register(events.NewMessage(incoming=True))
-async def mute_handler(event):
-    if db.is_muted(event.sender_id):
-        try:
-            await event.delete()
-        except Exception:
-            pass
+# مسار اللوج المحدد في main.py
+LOG_FILE = "سجل_الأخطاء.txt"
 
 def setup(client):
-    # تسجيل معالج الرسائل المكتومة في المحرك
-    client.add_event_handler(mute_handler)
+    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوك$"))
+    async def abood_log_handler(event):
+        """سحب سجل العمليات للهوست"""
+        if not os.path.exists(LOG_FILE):
+            return await event.edit("⚠️ **السجل فارغ حالياً يا عبود.**")
+        
+        await event.edit("⏳ **جاري تحضير السجل وإرساله...**")
+        
+        temp_name = f"log_abood_{int(time.time())}.txt"
+        try:
+            # نسخ الملف لتجنب مشاكل الوصول
+            shutil.copy2(LOG_FILE, temp_name)
+            me = await client.get_me()
+            # جلب اليوزر مع @
+            user_tag = f"@{me.username}" if me.username else me.first_name
+            
+            await client.send_file(
+                event.chat_id,
+                temp_file=temp_name,
+                caption=(
+                    f"📊 **سجل أخطاء سورس عبود المطور**\n"
+                    f"👤 **المطور:** {user_tag}\n"
+                    f"⏰ **الوقت:** `{time.ctime()}`\n"
+                    f"💎 **الحالة:** مستقر"
+                ),
+                reply_to=event.id
+            )
+            await event.delete()
+        except Exception as e:
+            await event.edit(f"❌ **حدث خطأ أثناء سحب اللوك:**\n`{e}`")
+        finally:
+            if os.path.exists(temp_name):
+                os.remove(temp_name)
 
-    # أمر كتم شخص (بالرد)
-    @client.ar_cmd(pattern="كتم$")
-    async def mute_user(event):
-        if not event.is_reply:
-            return await event.edit("**⚠️ يجب الرد على الشخص لكتمه.**")
-        
-        reply = await event.get_reply_message()
-        user_id = reply.sender_id
-        user = await event.client.get_entity(user_id)
-        
-        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
-        username = f"@{user.username}" if user.username else "لا يوجد"
-        
-        db.add_muted(user_id, full_name, username)
-        await event.edit(f"**👤 المستخدم: {full_name}\n✅ تم كتمه بنجاح.**")
+    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تصفير اللوك$"))
+    async def clear_log(event):
+        """مسح محتويات ملف السجل"""
+        if os.path.exists(LOG_FILE):
+            with open(LOG_FILE, "w", encoding="utf-8") as f:
+                f.write(f"📊 تم تصفير السجل بواسطة عبود | {time.ctime()}\n")
+            await event.edit("✅ **تم تصفير سجل الأخطاء بنجاح.**")
+        else:
+            await event.edit("⚠️ **لا يوجد ملف سجل لحذفه.**")
 
-    # أمر إلغاء الكتم (بالرد)
-    @client.ar_cmd(pattern="الغاء الكتم$")
-    async def unmute_user(event):
-        if not event.is_reply:
-            return await event.edit("**⚠️ يجب الرد على الشخص لالغاء كتمه.**")
-        
-        reply = await event.get_reply_message()
-        user_id = reply.sender_id
-        
-        db.remove_muted(user_id)
-        await event.edit("**✅ تم إلغاء الكتم عن الشخص بنجاح.**")
-
-    # أمر عرض قائمة المكتومين
-    @client.ar_cmd(pattern="المكتومين$")
-    async def list_muted(event):
-        muted_list = db.get_all_muted()
-        if not muted_list:
-            return await event.edit("**📭 قائمة المكتومين فارغة.**")
-        
-        msg = "**📋 قائمة المكتومين لديك:**\n\n"
-        for i, (uid, name, user) in enumerate(muted_list, 1):
-            msg += f"{i} - {name} ({user})\n"
-        
-        await event.edit(msg)
-
-    # أمر مسح كل المكتومين
-    @client.ar_cmd(pattern="مسح المكتومين$")
-    async def clear_muted(event):
-        db.clear_all_muted()
-        await event.edit("**🗑️ تم مسح جميع المكتومين من قاعدة البيانات.**")
+# موديول اللوك v8.0 - خاص بسورس عبود 🩵
