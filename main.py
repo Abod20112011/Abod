@@ -191,7 +191,7 @@ API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
 OWNER_ID = 6373993992 
 
 PLUGINS_DIR = "Plugins"
-ASSISTANT_DIR = "assistant" # تعديل: المجلد الآن خارج ملف الاضافات كما طلبت
+ASSISTANT_DIR = "assistant" # المجلد الآن خارج ملف الاضافات
 
 # إنشاء هيكلة المجلدات المطلوبة
 def check_folders():
@@ -254,13 +254,16 @@ async def bot_father_automation(client, bot_token):
         logger.info(f"⚙️ جاري ضبط بيانات {bot_user} عبر BotFather...")
         
         async with client.conversation("@BotFather") as conv:
+            # تفعيل الأونلاين
             await conv.send_message("/setinline")
             await asyncio.sleep(2)
             await conv.send_message(bot_user)
             await asyncio.sleep(2)
-            await conv.send_message("عبود 🩵") 
+            # نص وهمي يظهر في البحث بدل تغيير الاسم
+            await conv.send_message("بحث...") 
             await asyncio.sleep(2)
             
+            # ضبط قائمة الأوامر
             await conv.send_message("/setcommands")
             await asyncio.sleep(2)
             await conv.send_message(bot_user)
@@ -401,3 +404,4 @@ if __name__ == "__main__":
         logger.critical(f"🛑 خطأ: {fatal}")
 
 # نهاية الكود المطور
+
