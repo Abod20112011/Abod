@@ -1,32 +1,33 @@
 # -*- coding: utf-8 -*-
-# موديول الستارت لبوت المساعد - سورس عبود
+# موديول الستارت المطور - سحب التوكن تلقائياً
 from telethon import events, Button
+import sys
 
-# جلب العميل (البوت) الذي يعمل بالتوكن من ملف التشغيل الأساسي
+# محاولة جلب العميل (البوت) من النظام الأساسي
 try:
     import l313l
     client = l313l.l313l
 except Exception:
-    # حل احتياطي لضمان التعرف على توكن البوت المسجل
-    from __main__ import running_clients
-    # البحث عن وحدة البوت داخل الوحدات المشغلة
-    client = next((c for c in running_clients if c.is_bot()), None)
+    # البحث في الوحدات المشغلة داخل ملف التشغيل
+    if 'main' in sys.modules:
+        from __main__ import bot as client
+    else:
+        client = None
 
-@client.on(events.NewMessage(pattern="/start", incoming=True))
-async def abood_bot_start(event):
-    # الرد فقط في الخاص لضمان الخصوصية
-    if event.is_private:
-        # جلب معلومات المستخدم بشكل آمن
-        user = await event.get_sender()
-        name = user.first_name if user else "المستخدم"
-        
-        msg = f"**مرحباً بك عزيـزي {name} في سورس عبود المطور 📊**\n\n"
-        msg += "البوت يعمل الآن بنجاح عبر التوكن المسجل في الهوست ✅\n"
-        msg += "يمكنك استخدام الأوامر المتاحة لك."
-        
-        buttons = [
-            [Button.url("قناة السورس 📡", url="https://t.me/lAYAI")],
-            [Button.url("المطور 🧑🏻‍💻", url="https://t.me/BD_0I")]
-        ]
-        
-        await event.reply(msg, buttons=buttons)
+if client:
+    @client.on(events.NewMessage(pattern="/start", incoming=True))
+    async def assistant_start(event):
+        if event.is_private:
+            # جلب الاسم المسجل في قاعدة البيانات
+            user = await event.get_sender()
+            name = user.first_name if user else "عبود"
+            
+            msg = f"**مرحباً بك عزيـزي {name} ✨**\n"
+            msg += "أنا بوت المساعد الخاص بسورس عبود\n"
+            msg += "تم تفعيل الجلسة والتوكن بنجاح ✅"
+            
+            buttons = [
+                [Button.url("قناة المطور", url="https://t.me/aqhvv")],
+                [Button.url("الدعم الفني", url="https://t.me/BD_0I")]
+            ]
+            await event.reply(msg, buttons=buttons)
