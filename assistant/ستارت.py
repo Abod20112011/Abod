@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
-# ملف start.py - متوافق مع سورس عبود المطور V11.0
-# نظام زخرفة متعدد المستويات مع دعم عربي وإنجليزي
+# ملف start.py - نسخة مبسطة بدون زخرفة - متوافقة مع سورس عبود V11.0
 
-import re
-import random
 import json
 import requests
 import logging
@@ -101,16 +98,12 @@ bot_token = get_config("TOKEN")
 botusername = ""
 
 # قوائم المستخدمين
-dd = []              # وضع الزخرفة الإنجليزية
-arabic_decor = []    # وضع الزخرفة العربية
-number_decor = []    # وضع زخرفة الأرقام
 kk = []              # وضع إلغاء مؤقت
 tt = []              # وضع التواصل
 whisper_users = []   # وضع الفضفضة
 
 # الإيموجيات المميزة
 EMOJI_CONTACT = "5258215850745275216"
-EMOJI_DECOR = "5411580731929411768"
 EMOJI_DELETE = "5350477112677515642"
 EMOJI_CHANNEL = "5260450573768990626"
 EMOJI_fatfta = "5188619457651567219"
@@ -142,42 +135,12 @@ async def check_bot_started_users(user, event):
     if gvarstatus("BOTLOG_CHATID"):
         await event.client.send_message(int(gvarstatus("BOTLOG_CHATID")), notification, parse_mode='html')
 
-# ========== دوال الزخرفة ==========
-def apply_english_decorations(text):
-    """تطبيق جميع الزخارف الإنجليزية (WA1..WA37) وإرجاع نص منسق"""
-    WA1 = text.replace('a', 'ᵃ').replace('A', 'ᴬ').replace('b', 'ᵇ').replace('B', 'ᴮ').replace('c', 'ᶜ').replace('C', 'ᶜ').replace('d', 'ᵈ').replace('D', 'ᴰ').replace('e', 'ᵉ').replace('E', 'ᴱ').replace('f', 'ᶠ').replace('F', 'ᶠ').replace('g', 'ᵍ').replace('G', 'ᴳ').replace('h', 'ʰ').replace('H', 'ᴴ').replace('i', 'ⁱ').replace('I', 'ᴵ').replace('j', 'ʲ').replace('J', 'ᴶ').replace('k', 'ᵏ').replace('K', 'ᴷ').replace('l', 'ˡ').replace('L', 'ᴸ').replace('m', 'ᵐ').replace('M', 'ᴹ').replace('n', 'ⁿ').replace('N', 'ᴺ').replace('o', 'ᵒ').replace('O', 'ᴼ').replace('p', 'ᵖ').replace('P', 'ᴾ').replace('q', '۩').replace('Q', 'Q').replace('r', 'ʳ').replace('R', 'ᴿ').replace('s', 'ˢ').replace('S', 'ˢ').replace('t', 'ᵗ').replace('T', 'ᵀ').replace('u', 'ᵘ').replace('U', 'ᵁ').replace('v', 'ⱽ').replace('V', 'ⱽ').replace('w', 'ʷ').replace('W', 'ᵂ').replace('x', 'ˣ').replace('X', 'ˣ').replace('y', 'ʸ').replace('Y', 'ʸ').replace('z', 'ᶻ').replace('Z', 'ᶻ')
-    WA2 = text.replace('a', 'ᴀ').replace('b', 'ʙ').replace('c', 'ᴄ').replace('d', 'ᴅ').replace('e', 'ᴇ').replace('f', 'ғ').replace('g', 'ɢ').replace('h', 'ʜ').replace('i', 'ɪ').replace('j', 'ᴊ').replace('k', 'ᴋ').replace('l', 'ʟ').replace('m', 'ᴍ').replace('n', 'ɴ').replace('o', 'ᴏ').replace('p', 'ᴘ').replace('q', 'ǫ').replace('r', 'ʀ').replace('s', 's').replace('t', 'ᴛ').replace('u', 'ᴜ').replace('v', 'ᴠ').replace('w', 'ᴡ').replace('x', 'x').replace('y', 'ʏ').replace('z', 'ᴢ').replace('A', 'ᴀ').replace('B', 'ʙ').replace('C', 'ᴄ').replace('D', 'ᴅ').replace('E', 'ᴇ').replace('F', 'ғ').replace('G', 'ɢ').replace('H', 'ʜ').replace('I', 'ɪ').replace('J', 'ᴊ').replace('K', 'ᴋ').replace('L', 'ʟ').replace('M', 'ᴍ').replace('N', 'ɴ').replace('O', 'ᴏ').replace('P', 'ᴘ').replace('Q', 'ǫ').replace('R', 'ʀ').replace('S', 'S').replace('T', 'ᴛ').replace('U', 'ᴜ').replace('V', 'ᴠ').replace('W', 'ᴡ').replace('X', 'X').replace('Y', 'ʏ').replace('Z', 'ᴢ')
-    # ... (باقي WA3..WA37 كما هي في الرد السابق، سأكتبها مختصرة هنا لتوفير المساحة لكن في الكود الكامل سيتم تضمينها كاملة)
-    # لضمان عدم الحذف، سأدرج جميع WA3..WA37 في الكود النهائي (موجودة في الأسفل)
-    # سأقوم بجمع النتائج في نص واحد
-    result = f"**1-** {WA1}\n\n**2-** {WA2}\n\n**3-** {WA3}\n\n... إلخ"
-    return result
-
-# يجب تضمين جميع WA3..WA37 هنا (سأضعها كاملة في الكود النهائي)
-
-def arabic_text_decor(text):
-    """زخرفة عربية بسيطة (إضافة حركات ورموز)"""
-    # يمكن تطويرها حسب الحاجة
-    decorated = text
-    harakat = ['َ', 'ِ', 'ُ', 'ْ', 'ٌ', 'ٍ', 'ً', 'ّ']
-    symbols = ['✨', '💠', '🔹', '▪️', '▫️', '●', '○', '◉']
-    # إضافة زخارف عشوائية
-    for _ in range(2):
-        decorated = random.choice(harakat) + decorated + random.choice(harakat)
-    decorated = random.choice(symbols) + ' ' + decorated + ' ' + random.choice(symbols)
-    return decorated
-
-def number_decorations(num_str):
-    """زخرفة أرقام"""
-    replacements = {
-        '0': '𝟬', '1': '𝟭', '2': '𝟮', '3': '𝟯', '4': '𝟰',
-        '5': '𝟱', '6': '𝟲', '7': '𝟳', '8': '𝟴', '9': '𝟵'
-    }
-    return ''.join(replacements.get(ch, ch) for ch in num_str)
-
 # ========== دالة الإعداد ==========
 def setup(client):
     global botusername
+
+    # جلب معلومات الحساب الشخصي (المطور) عند بدء التشغيل
+    owner_info = {"name": "المطور", "username": ""}
 
     @client.on(events.NewMessage)
     async def get_bot_info(event):
@@ -185,6 +148,13 @@ def setup(client):
         if not botusername:
             me = await client.get_me()
             botusername = f"@{me.username}" if me.username else ""
+        # تحديث معلومات المطور
+        try:
+            owner = await client.get_entity(OWNER_ID)
+            owner_info["name"] = get_display_name(owner)
+            owner_info["username"] = owner.username if owner.username else ""
+        except:
+            pass
 
     # ========== الأمر /start ==========
     @client.on(events.NewMessage(incoming=True, pattern=r'^/start'))
@@ -204,14 +174,14 @@ def setup(client):
 
         my_fullname = f"{user.first_name} {user.last_name}" if user.last_name else user.first_name
 
-        zz_txt = "• المـطـور •"
-        zz_ch = gvarstatus("START_BUTUN") or (user.username if user.username else "aqhvv")
-        zid = int(gvarstatus("ZThon_Vip") or 5427469031)
-        custompic = gvarstatus("BOT_START_PIC") or None
+        # استخدام معلومات المطور من الجلسة
+        dev_name = owner_info["name"]
+        dev_uname = owner_info["username"]
+        dev_url = f"https://t.me/{dev_uname}" if dev_uname else f"tg://user?id={OWNER_ID}"
+        dev_text = dev_name
 
         PREMIUM_EMOJI_ID = 5210763312597326700
         EMOJI_HEART = 5258215850745275216
-        EMOJI_ART = 5411580731929411768
         EMOJI_WARN = 5350477112677515642
         EMOJI_Fatf = 5188619457651567219
 
@@ -222,34 +192,26 @@ def setup(client):
 
 ❶ <b>التواصـل مـع مـالكـي مـن هنـا</b> <tg-emoji emoji-id="{EMOJI_HEART}">💌</tg-emoji>
 من خـلال زر <b>اضغـط لـ التواصـل</b>
-❷ <b>زخـرفـة النصـوص والأسمـاء</b> <tg-emoji emoji-id="{EMOJI_ART}">🎨</tg-emoji>
-❸ <b>حـذف الحسـابات نهـائياً</b> <tg-emoji emoji-id="{EMOJI_WARN}">⚠️</tg-emoji>
-❹ <b>فَضفـضه بَهوية مجهولـة</b> <tg-emoji emoji-id="{EMOJI_Fatf}">✉️</tg-emoji>
+❷ <b>حـذف الحسـابات نهـائياً</b> <tg-emoji emoji-id="{EMOJI_WARN}">⚠️</tg-emoji>
+❸ <b>فَضفـضه بَهوية مجهولـة</b> <tg-emoji emoji-id="{EMOJI_Fatf}">✉️</tg-emoji>
 ﹎﹎﹎﹎﹎﹎﹎﹎﹎﹎
 <tg-emoji emoji-id="{PREMIUM_EMOJI_ID}">👇</tg-emoji> <b>لـ البـدء إستخـدم الازرار بالاسفـل</b>'''
 
-        # الأزرار حسب نوع المستخدم
-        if chat.id == OWNER_ID and chat.id != zid:
+        # أزرار بسيطة بدون زخرفة
+        if chat.id == OWNER_ID:
             buttons = [
-                [{"text": "زخـارف تمبلـر", "callback_data": "decor_main_menu", "style": "primary", "icon_custom_emoji_id": EMOJI_DECOR}],
                 [{"text": "لـ حـذف حسـابك", "callback_data": "zzk_bot-5", "style": "danger", "icon_custom_emoji_id": EMOJI_DELETE}]
-            ]
-        elif chat.id == OWNER_ID and chat.id == zid:
-            buttons = [
-                [{"text": "زخـارف تمبلـر", "callback_data": "decor_main_menu", "style": "primary", "icon_custom_emoji_id": EMOJI_DECOR}],
-                [{"text": "لـ حـذف حسـابك", "callback_data": "zzk_bot-5", "style": "danger", "icon_custom_emoji_id": EMOJI_DELETE}],
-                [{"text": zz_txt, "url": f"https://t.me/{zz_ch}", "style": "primary", "icon_custom_emoji_id": EMOJI_CHANNEL}]
             ]
         else:
             buttons = [
                 [{"text": "اضغـط لـ التواصـل", "callback_data": "ttk_bot-1", "style": "primary", "icon_custom_emoji_id": EMOJI_CONTACT}],
                 [{"text": "فَضفضة بَهوية مجهولـة", "callback_data": "whisper_menu", "style": "success", "icon_custom_emoji_id": EMOJI_fatfta}],
                 [{"text": "لـ حـذف حسـابك", "callback_data": "zzk_bot-5", "style": "danger", "icon_custom_emoji_id": EMOJI_DELETE}],
-                [{"text": "زخـارف تمبلـر", "callback_data": "decor_main_menu", "style": "success", "icon_custom_emoji_id": EMOJI_DECOR}],
-                [{"text": zz_txt, "url": f"https://t.me/{zz_ch}", "style": "primary", "icon_custom_emoji_id": EMOJI_CHANNEL}]
+                [{"text": dev_text, "url": dev_url, "style": "primary", "icon_custom_emoji_id": EMOJI_CHANNEL}]
             ]
 
         try:
+            custompic = gvarstatus("BOT_START_PIC")
             if custompic:
                 await client.send_file(chat.id, file=custompic, caption='<b>🎉 مرحباً بك في البوت المساعد</b>', link_preview=False, reply_to=reply_to, parse_mode='html')
             send_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -289,7 +251,7 @@ def setup(client):
                 return
         if chat.id != OWNER_ID:
             if event.text and event.text.startswith("/cancle"):
-                for lst in [dd, arabic_decor, number_decor, kk, tt, whisper_users]:
+                for lst in [kk, tt, whisper_users]:
                     if chat.id in lst: lst.remove(chat.id)
                 return await client.send_message(chat.id, "**- تم الالغـاء .. بنجـاح**")
 
@@ -315,84 +277,13 @@ def setup(client):
                                           buttons=[[Button.inline("تعطيـل التواصـل", data="ttk_bot-off")]], reply_to=reply_to)
                 return
 
-            # وضع الزخرفة الإنجليزية
-            if chat.id in dd:
-                text = event.text
-                # هنا نطبق جميع WA1..WA37
-                WA1 = text.replace('a', 'ᵃ').replace('A', 'ᴬ').replace('b', 'ᵇ').replace('B', 'ᴮ').replace('c', 'ᶜ').replace('C', 'ᶜ').replace('d', 'ᵈ').replace('D', 'ᴰ').replace('e', 'ᵉ').replace('E', 'ᴱ').replace('f', 'ᶠ').replace('F', 'ᶠ').replace('g', 'ᵍ').replace('G', 'ᴳ').replace('h', 'ʰ').replace('H', 'ᴴ').replace('i', 'ⁱ').replace('I', 'ᴵ').replace('j', 'ʲ').replace('J', 'ᴶ').replace('k', 'ᵏ').replace('K', 'ᴷ').replace('l', 'ˡ').replace('L', 'ᴸ').replace('m', 'ᵐ').replace('M', 'ᴹ').replace('n', 'ⁿ').replace('N', 'ᴺ').replace('o', 'ᵒ').replace('O', 'ᴼ').replace('p', 'ᵖ').replace('P', 'ᴾ').replace('q', '۩').replace('Q', 'Q').replace('r', 'ʳ').replace('R', 'ᴿ').replace('s', 'ˢ').replace('S', 'ˢ').replace('t', 'ᵗ').replace('T', 'ᵀ').replace('u', 'ᵘ').replace('U', 'ᵁ').replace('v', 'ⱽ').replace('V', 'ⱽ').replace('w', 'ʷ').replace('W', 'ᵂ').replace('x', 'ˣ').replace('X', 'ˣ').replace('y', 'ʸ').replace('Y', 'ʸ').replace('z', 'ᶻ').replace('Z', 'ᶻ')
-                WA2 = text.replace('a', 'ᴀ').replace('b', 'ʙ').replace('c', 'ᴄ').replace('d', 'ᴅ').replace('e', 'ᴇ').replace('f', 'ғ').replace('g', 'ɢ').replace('h', 'ʜ').replace('i', 'ɪ').replace('j', 'ᴊ').replace('k', 'ᴋ').replace('l', 'ʟ').replace('m', 'ᴍ').replace('n', 'ɴ').replace('o', 'ᴏ').replace('p', 'ᴘ').replace('q', 'ǫ').replace('r', 'ʀ').replace('s', 's').replace('t', 'ᴛ').replace('u', 'ᴜ').replace('v', 'ᴠ').replace('w', 'ᴡ').replace('x', 'x').replace('y', 'ʏ').replace('z', 'ᴢ').replace('A', 'ᴀ').replace('B', 'ʙ').replace('C', 'ᴄ').replace('D', 'ᴅ').replace('E', 'ᴇ').replace('F', 'ғ').replace('G', 'ɢ').replace('H', 'ʜ').replace('I', 'ɪ').replace('J', 'ᴊ').replace('K', 'ᴋ').replace('L', 'ʟ').replace('M', 'ᴍ').replace('N', 'ɴ').replace('O', 'ᴏ').replace('P', 'ᴘ').replace('Q', 'ǫ').replace('R', 'ʀ').replace('S', 'S').replace('T', 'ᴛ').replace('U', 'ᴜ').replace('V', 'ᴠ').replace('W', 'ᴡ').replace('X', 'X').replace('Y', 'ʏ').replace('Z', 'ᴢ')
-                # ... (أكمل WA3..WA37 كما في الكود السابق)
-                # سأقوم بإدراجها كاملة في الملف النهائي
-                WA37 = text.replace('a','𝐀').replace("b","𝐁").replace("c","𝐂").replace("d","𝐃").replace("e","𝐄").replace("f","𝐅").replace("g","𝐆").replace("h","𝐇").replace("i","𝐈").replace("j","𝐉").replace("k","𝐊").replace("l","𝐋").replace("m","𝐌").replace("n","𝐍").replace("o","𝐎").replace("p","𝐏").replace("q","𝐐").replace("r","𝐑").replace("s","𝐒").replace("t","𝐓").replace("u","𝐔").replace("v","𝐕").replace("w","𝐖").replace("x","𝐗").replace("y","𝐘").replace("z","𝐙")
-                reply_text = f"**1-** {WA1}\n\n**2-** {WA2}\n\n**3-** {WA3}\n\n... إلخ حتى 37"
-                await client.send_message(chat.id, reply_text, reply_to=reply_to)
-                dd.remove(chat.id)  # إلغاء الوضع بعد الزخرفة
-                return
-
-            # وضع الزخرفة العربية
-            if chat.id in arabic_decor:
-                decorated = arabic_text_decor(event.text)
-                await client.send_message(chat.id, f"**النص بعد الزخرفة العربية:**\n{decorated}", reply_to=reply_to)
-                arabic_decor.remove(chat.id)
-                return
-
-            # وضع زخرفة الأرقام
-            if chat.id in number_decor:
-                decorated = number_decorations(event.text)
-                await client.send_message(chat.id, f"**الأرقام بعد الزخرفة:**\n{decorated}", reply_to=reply_to)
-                number_decor.remove(chat.id)
-                return
-
-    # ========== نظام القوائم (Callbacks) ==========
+    # ========== معالج الأزرار (Callbacks) ==========
     @client.on(events.CallbackQuery())
     async def callback_handler(event):
         data = event.data.decode()
         chat_id = event.chat_id
 
-        # --- القائمة الرئيسية للزخرفة ---
-        if data == "decor_main_menu":
-            buttons = [
-                [Button.inline("⌔ زخرفة إنجليزية ⌔", data="decor_english")],
-                [Button.inline("⌔ رموز تمبلر ⌔", data="decor_tumblr_symbols")],
-                [Button.inline("⌔ زخرفة أرقام ⌔", data="decor_numbers")],
-                [Button.inline("⌔ زخرفة عربية ⌔", data="decor_arabic")],
-                [Button.inline("⌔ رجوع ⌔", data="back_to_start")]
-            ]
-            await event.edit("**✨ اختر نوع الزخرفة:**", buttons=buttons)
-
-        # --- الإنجليزية: طلب النص ---
-        elif data == "decor_english":
-            if chat_id not in dd:
-                dd.append(chat_id)
-            await event.edit("**🔤 أرسل النص الإنجليزي الذي تريد زخرفته:**")
-
-        # --- العربية: طلب النص ---
-        elif data == "decor_arabic":
-            if chat_id not in arabic_decor:
-                arabic_decor.append(chat_id)
-            await event.edit("**🎨 أرسل النص العربي الذي تريد زخرفته:**")
-
-        # --- الأرقام: طلب الرقم ---
-        elif data == "decor_numbers":
-            if chat_id not in number_decor:
-                number_decor.append(chat_id)
-            await event.edit("**🔢 أرسل الأرقام التي تريد زخرفتها:**")
-
-        # --- رموز تمبلر ---
-        elif data == "decor_tumblr_symbols":
-            symbols = ['࿐', '𖣳', '𓃠', '𖡟', '𖠜', '‌♡⁩', '‌༗', '‌𖢖', '❥', '‌ঌ', '𝆹𝅥𝅮', '𖠲', '𖤍', '𖠛', ' 𝅘𝅥𝅮', '‌༒', '‌ㇱ', '߷', 'メ', '〠', '𓃬', '𖠄']
-            sym_text = "**🎭 رموز تمبلر:**\n" + "  ".join(symbols)
-            await event.edit(sym_text, buttons=[[Button.inline("رجوع", data="decor_main_menu")]])
-
-        # --- العودة للقائمة الرئيسية ---
-        elif data == "back_to_start":
-            # إعادة إرسال رسالة start (يمكن استدعاء bot_start لكن نعيد بناءها)
-            await event.delete()
-            # يمكن إرسال /start مرة أخرى للمستخدم
-            await client.send_message(chat_id, "/start")
-
-        # --- بقية الأزرار (التواصل، الحذف، الفضفضة) ---
-        elif data == "zzk_bot-5":
+        if data == "zzk_bot-5":
             await event.answer("سيتم توجيهك لصفحة حذف الحساب", alert=True)
             await client.send_message(chat_id, "https://my.telegram.org/auth?to=delete")
         elif data == "ttk_bot-1":
@@ -418,4 +309,4 @@ def setup(client):
                 tt.remove(chat_id)
                 await event.answer("❌ تم تعطيل وضع التواصل.")
 
-    LOGS.info("✅ تم تحميل موديول start.py مع نظام زخرفة متعدد المستويات.")
+    LOGS.info("✅ تم تحميل موديول start.py (نسخة خالية من الزخرفة).")
