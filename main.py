@@ -6,22 +6,26 @@ def setup_environment():
         print("🛠️ جاري فحص المكتبات لضمان عمل أمر 'اللوك' وسحب السجلات...")
         # تحديث المكتبات الأساسية لضمان عدم حدوث ImportError
         required_libs = ["telethon==1.31.0", "pytz", "pydantic", "aiohttp", "requests", "bs4"]
+        # استخدام نسخة Pip المناسبة للبيئة
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "--upgrade"] + required_libs)
     except Exception as e:
         print(f"⚠️ تنبيه: فشل التحديث التلقائي، سيتم استخدام النسخ الحالية: {e}")
 
+# استدعاء دالة التجهيز قبل أي استيراد آخر
 setup_environment()
 
 from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
 
-# معالجة استيراد ميزات طلبات الانضمام
+# معالجة استيراد ميزات طلبات الانضمام (بشكل آمن لضمان عدم توقف الموديول)
 try:
     from telethon.tl.types import UpdateBotChatJoinRequest, UpdateChatJoinRequest
     from telethon.tl.functions.messages import HideChatJoinRequestRequest
     HAS_JOIN_SUPPORT = True
-except ImportError:
+except (ImportError, SyntaxError):
     HAS_JOIN_SUPPORT = False
+    print("⚠️ تحذير: نسخة Telethon لا تدعم ميزات طلبات الانضمام الجديدة.")
+
 
 # --- [ 2. إعدادات سجل العمليات (LOG) ] ---
 # ملاحظة: هذا هو الملف الذي سيتم إرساله عند كتابة .لوك
