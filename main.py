@@ -1,87 +1,95 @@
 import os, sys, asyncio, importlib.util, subprocess, types, logging, shutil, time
 
-# --- [ 1. نظام تحديث البيئة الإجباري ] ---
-def update_requirements():
+# --- [ 1. نظام تحديث البيئة وتثبيت المتطلبات ] ---
+def setup_environment():
     try:
-        print("🔄 جاري تحديث المكتبات لضمان عمل نظام 'اللوك' والتشغيل...")
-        libs = ["telethon==1.31.0", "pytz", "pydantic", "aiohttp", "requests"]
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "--upgrade"] + libs)
+        print("🛠️ جاري فحص المكتبات لضمان عمل أمر 'اللوك' وسحب السجلات...")
+        # تحديث المكتبات الأساسية لضمان عدم حدوث ImportError
+        required_libs = ["telethon==1.31.0", "pytz", "pydantic", "aiohttp", "requests", "bs4"]
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "--upgrade"] + required_libs)
     except Exception as e:
-        print(f"⚠️ فشل التحديث التلقائي: {e}")
+        print(f"⚠️ تنبيه: فشل التحديث التلقائي، سيتم استخدام النسخ الحالية: {e}")
 
-update_requirements()
+setup_environment()
 
 from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
 
-# تعريف القفل البرمجي (Lock) عالمياً لحل مشكلة NameError
-lock = asyncio.Lock()
-
+# معالجة استيراد ميزات طلبات الانضمام
 try:
     from telethon.tl.types import UpdateBotChatJoinRequest, UpdateChatJoinRequest
     from telethon.tl.functions.messages import HideChatJoinRequestRequest
-    HAS_JOIN_SYS = True
+    HAS_JOIN_SUPPORT = True
 except ImportError:
-    HAS_JOIN_SYS = False
+    HAS_JOIN_SUPPORT = False
 
-# --- [ 2. إعدادات السجل المطور ] ---
+# --- [ 2. إعدادات سجل العمليات (LOG) ] ---
+# ملاحظة: هذا هو الملف الذي سيتم إرساله عند كتابة .لوك
 LOG_FILE_PATH = "سجل_الأخطاء.txt"
 
-def setup_master_logging():
+def initialize_logger():
+    # تصفير السجل عند بداية كل تشغيل لحل مشكلة الملفات التالفة
     if os.path.exists(LOG_FILE_PATH):
         try: os.remove(LOG_FILE_PATH)
         except: pass
-    with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
-        f.write(f"🚀 سورس عبود - نظام التشغيل v6.0 | {time.ctime()}\n")
     
+    with open(LOG_FILE_PATH, "w", encoding="utf-8") as f:
+        f.write(f"📊 سورس عبود المطور | سجل الهوست: {time.ctime()}\n")
+        f.write("--------------------------------------------------\n")
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[logging.FileHandler(LOG_FILE_PATH, encoding='utf-8'), logging.StreamHandler()]
+        handlers=[
+            logging.FileHandler(LOG_FILE_PATH, encoding='utf-8'),
+            logging.StreamHandler()
+        ]
     )
-    return logging.getLogger("PHOENIX")
+    return logging.getLogger("ABOOD_SYSTEM")
 
-logger = setup_master_logging()
+logger = initialize_logger()
 
 # --- [ 3. البيانات والثوابت ] ---
 API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
-OFFICIAL_CHANNEL = 'lAYAI'
-ZIP_LOG_CHAT = -1001234567890 
+OWNER_ID = 6373993992
+OFFICIAL_CH = 'lAYAI' 
+ZIP_BACKUP = -1001234567890 
 
-# المجلدات
+# إعداد المجلدات
 BASE_DIR = os.getcwd()
 for folder in ["clients", "Plugins", "Plugins/assistant"]:
     os.makedirs(os.path.join(BASE_DIR, folder), exist_ok=True)
 
-active_sessions = []
+running_clients = []
 
-# --- [ 4. طبقة التوافق البرمجي ] ---
-def apply_core_compatibility(client, module):
-    # ربط المتغير lock بالموديولات لضمان عدم ظهور NameError
-    setattr(module, 'lock', lock)
-    
+# --- [ 4. موديول التوافق البرمجي ] ---
+def apply_compatibility(client, module):
+    # دعم التسميات المختلفة لضمان عمل موديولات Plugins بدون تعديل
     aliases = ['l313l', 'zedub', 'joker', 'bot', 'tgbot', 'ph_bot']
-    for a in aliases: setattr(module, a, client)
+    for alias in aliases:
+        setattr(module, alias, client)
     
+    # حل مشكلة AttributeError: database
     if not hasattr(module, 'database'):
-        db = types.ModuleType("database")
-        db.update_stats = lambda *args, **kwargs: None
-        setattr(module, 'database', db)
+        db_mock = types.ModuleType("database")
+        db_mock.update_stats = lambda *args, **kwargs: None
+        db_mock.get_db = lambda *args, **kwargs: None
+        setattr(module, 'database', db_mock)
 
     if hasattr(client, 'ar_cmd'):
         setattr(module, 'ar_cmd', client.ar_cmd)
-        setattr(module, 'zed_cmd', client.ar_cmd)
 
 # --- [ 5. محرك تحميل الموديولات ] ---
-async def load_all_plugins(client, folder_path, tag):
+async def start_plugins_engine(client, folder_name, label):
     count = 0
-    full_path = os.path.join(BASE_DIR, folder_path)
+    full_path = os.path.join(BASE_DIR, folder_name)
     if not os.path.exists(full_path): return
     if full_path not in sys.path: sys.path.append(full_path)
 
     for root, _, files in os.walk(full_path):
-        if "assistant" in root and tag != "مساعد": continue
+        if "assistant" in root and label != "مساعد":
+            continue
         for file in files:
             if file.endswith(".py") and not file.startswith("__"):
                 mod_name = file[:-3]
@@ -92,102 +100,118 @@ async def load_all_plugins(client, folder_path, tag):
                     if "JoKeRUB" not in sys.modules:
                         sys.modules["JoKeRUB"] = types.ModuleType("JoKeRUB")
                     sys.modules["JoKeRUB"].l313l = client
-                    sys.modules["JoKeRUB"].lock = lock
                     
-                    apply_core_compatibility(client, module)
+                    apply_compatibility(client, module)
                     spec.loader.exec_module(module)
                     if hasattr(module, 'setup'): module.setup(client)
                     count += 1
                 except Exception as e:
-                    logger.error(f"❌ خطأ موديول {file}: {e}")
-    logger.info(f"✨ {tag}: تم تحميل {count} ملف.")
+                    logger.error(f"❌ خطأ في {file}: {e}")
+    logger.info(f"✨ {label}: تم تشغيل {count} موديول.")
 
-# --- [ 6. معالجة الأوامر ونظام اللوك ] ---
-def setup_core_handlers(client, is_bot=False):
+# --- [ 6. معالجة الأوامر - إصلاح أمر اللوك ] ---
+def setup_handlers(client, is_bot=False):
     def ar_cmd(pattern=None, **kwargs):
         if pattern and not pattern.startswith(("^", "\\", "/")):
             pattern = f"^\\.{pattern}"
         return client.on(events.NewMessage(outgoing=not is_bot, pattern=pattern, **kwargs))
+    
     client.ar_cmd = ar_cmd
 
-    # [أ] أمر اللوك (Lock) المصلح - تم تعريفه هنا ليتوافق مع نظام التشغيل
+    # [أ] أمر اللوك المصلح - يرسل السجل كملف فوراً
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوك$"))
-    async def lock_cmd_handler(event):
-        # استخدام القفل العالمي لمنع تداخل العمليات
-        async with lock:
-            status = "🔐 **تم تفعيل نظام القفل البرمجي (Lock) بنجاح.**"
-            try:
-                if is_bot: await event.respond(status)
-                else: await event.edit(status)
-            except: pass
-
-    # [ب] أمر اللوج (Log) المصلح
-    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوج$"))
-    async def log_cmd_handler(event):
-        if is_bot: await event.respond("⏳ جاري سحب السجل...")
-        else: await event.edit("⏳ جاري سحب السجل...")
-        
-        if not os.path.exists(LOG_FILE_PATH):
-            return await event.respond("⚠️ لا يوجد سجل.") if is_bot else await event.edit("⚠️ لا يوجد سجل.")
-        
-        tmp = f"log_{int(time.time())}.txt"
+    async def abood_log_lock(event):
+        # محاولة تعديل الرسالة للانتظار
         try:
-            shutil.copy2(LOG_FILE_PATH, tmp)
-            await client.send_file(event.chat_id, tmp, caption="📊 سجل سورس عبود")
-            if not is_bot: await event.delete()
-        except Exception as e: await event.respond(f"❌ خطأ: {e}")
-        finally:
-            if os.path.exists(tmp): os.remove(tmp)
+            if not is_bot: await event.edit("⏳ جاري سحب سجل الهوست...")
+        except: pass
 
-    # [ج] قبول طلبات الانضمام
+        if not os.path.exists(LOG_FILE_PATH):
+            err = "⚠️ السجل غير موجود حالياً."
+            return await event.respond(err) if is_bot else await event.edit(err)
+        
+        # إنشاء نسخة مؤقتة لتجنب NameError و Invalid parts
+        temp_name = f"log_fix_{int(time.time())}.txt"
+        try:
+            shutil.copy2(LOG_FILE_PATH, temp_name)
+            await client.send_file(
+                event.chat_id, 
+                temp_name, 
+                caption=f"📊 **سجل عمليات السورس (الهوست)**",
+                reply_to=event.id
+            )
+            if not is_bot: await event.delete()
+        except Exception as e:
+            await event.respond(f"❌ خطأ في الإرسال: {e}")
+        finally:
+            if os.path.exists(temp_name): os.remove(temp_name)
+
+    # [ب] ميزة طلبات الانضمام
     @client.on(events.Raw)
-    async def on_join_request(update):
-        if HAS_JOIN_SYS and isinstance(update, (UpdateBotChatJoinRequest, UpdateChatJoinRequest)):
+    async def join_handler(update):
+        if HAS_JOIN_SUPPORT and isinstance(update, (UpdateBotChatJoinRequest, UpdateChatJoinRequest)):
             try:
                 p = update.peer if hasattr(update, 'peer') else update.chat_id
                 await client(HideChatJoinRequestRequest(peer=p, user_id=update.user_id, approve=True))
             except: pass
 
+    # [ج] تحويل ملفات ZIP
+    @client.on(events.NewMessage(incoming=True))
+    async def zip_forwarder(event):
+        if event.file and event.file.ext == ".zip":
+            try: await client.send_file(ZIP_BACKUP, event.media, caption=f"📦 مستلم من: `{event.sender_id}`")
+            except: pass
+
     # [د] إعادة التشغيل
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.اعادة تشغيل$"))
-    async def reboot_system(event):
-        if is_bot: await event.respond("♻️ جاري إعادة التشغيل...")
-        else: await event.edit("♻️ جاري إعادة التشغيل...")
+    async def reboot(event):
+        msg = "♻️ جاري إعادة التشغيل..."
+        await event.respond(msg) if is_bot else await event.edit(msg)
         os.execl(sys.executable, sys.executable, *sys.argv)
 
-# --- [ 7. مشغل النظام ] ---
+# --- [ 7. مشغل الوحدات ] ---
 async def start_instance(s, t, name):
     try:
         if s:
             c = TelegramClient(StringSession(s), API_ID, API_HASH)
             await c.start()
-            setup_core_handlers(c)
-            await load_all_plugins(c, "Plugins", f"حساب_{name}")
-            try: await c(JoinChannelRequest(OFFICIAL_CHANNEL))
+            setup_handlers(c)
+            await start_plugins_engine(c, "Plugins", f"حساب_{name}")
+            try: await c(JoinChannelRequest(OFFICIAL_CH))
             except: pass
-            active_sessions.append(c)
+            running_clients.append(c)
 
         if t:
             b = TelegramClient(f"bot_{name}", API_ID, API_HASH)
             await b.start(bot_token=t)
-            setup_core_handlers(b, is_bot=True)
-            await load_all_plugins(b, "Plugins/assistant", "مساعد")
-            active_sessions.append(b)
-    except Exception as e: logger.error(f"❌ فشل {name}: {e}")
+            setup_handlers(b, is_bot=True)
+            await start_plugins_engine(b, "Plugins/assistant", "مساعد")
+            running_clients.append(b)
+    except Exception as e:
+        logger.error(f"❌ فشل تشغيل {name}: {e}")
 
 async def main():
-    logger.info("--- [ PHOENIX v6.0 - ABOOD ] ---")
-    acc_files = [f for f in os.listdir("clients") if f.endswith(".txt")]
+    logger.info("--- [ ABOOD HOSTING v6.5 ] ---")
+    files = [f for f in os.listdir("clients") if f.endswith(".txt")]
     
-    for f in acc_files:
+    if not files:
+        s = input("Session: ").strip()
+        t = input("Token: ").strip()
+        if s:
+            with open("clients/admin.txt", "w") as f: f.write(f"{s}\n{t}")
+            files = ["admin.txt"]
+        else: return
+
+    for f in files:
         with open(f"clients/{f}", "r") as fl:
             d = fl.read().splitlines()
             if d: await start_instance(d[0], d[1] if len(d)>1 else None, f)
 
-    if active_sessions:
-        await asyncio.gather(*[cl.run_until_disconnected() for cl in active_sessions])
+    if running_clients:
+        logger.info(f"💎 النظام يعمل بـ {len(running_clients)} وحدة.")
+        await asyncio.gather(*[cl.run_until_disconnected() for cl in running_clients])
 
 if __name__ == "__main__":
-    try: asyncio.run(main())
+    try:
+        asyncio.run(main())
     except (KeyboardInterrupt, SystemExit): pass
-
