@@ -3,8 +3,13 @@ from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import JoinChannelRequest
 
-# --- [ نظام سجل الأخطاء المطور ] ---
+# --- [ تنظيف سجل الأخطاء القديم عند التشغيل ] ---
 LOG_FILENAME = "سجل الأخطاء.txt"
+if os.path.exists(LOG_FILENAME):
+    try: os.remove(LOG_FILENAME)
+    except: pass
+
+# --- [ نظام سجل الأخطاء المطور ] ---
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -75,12 +80,39 @@ async def load_plugins(client, folder_path, label):
                     logger.error(f"❌ خطأ في تحميل {file} من {label}: {e}")
     logger.info(f"✅ {label}: تم تشغيل {count} موديول بنجاح.")
 
+# --- [ ميزة التنصيب وإعادة التشغيل ] ---
 def add_handler_to_client(client, is_bot=False):
     def ar_cmd(pattern=None, **kwargs):
         if pattern and not pattern.startswith(("^", "\\", "/")):
             pattern = f"^\\.{pattern}"
         return client.on(events.NewMessage(outgoing=not is_bot, pattern=pattern, **kwargs))
+    
     client.ar_cmd = ar_cmd
+
+    # أمر إعادة التشغيل
+    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.اعادة تشغيل$"))
+    async def restart_handler(event):
+        await event.edit("🔄 جارٍ إعادة تشغيل نظام aBooD...")
+        os.execl(sys.executable, sys.executable, *sys.argv)
+
+    # أمر التنصيب للحسابات الأخرى
+    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تنصيب(?:\s+(.*))?"))
+    async def deploy_handler(event):
+        if not event.is_reply:
+            return await event.edit("⚠️ يرجى الرد على كود الجلسة (String Session) لإتمام التنصيب.")
+        
+        reply_msg = await event.get_reply_message()
+        session_text = reply_msg.text.strip()
+        bot_token = event.pattern_match.group(1).strip() if event.pattern_match.group(1) else ""
+        
+        user_id = reply_msg.sender_id
+        file_path = os.path.join(CLIENTS_DIR, f"user_{user_id}.txt")
+        
+        with open(file_path, "w") as f:
+            f.write(f"{session_text}\n{bot_token}")
+        
+        await event.edit(f"✅ تم حفظ بيانات الحساب {user_id} بنجاح. سيتم التشغيل الآن...")
+        await start_instance(session_text, bot_token, f"user_{user_id}")
 
 # --- دالة تشغيل الحساب أو البوت ---
 async def start_instance(session_str, bot_token, identifier):
@@ -91,19 +123,25 @@ async def start_instance(session_str, bot_token, identifier):
             await client.start()
             add_handler_to_client(client, is_bot=False)
             await load_plugins(client, PLUGINS_PATH, f"حساب_{identifier}")
-            logger.info(f"🚀 تم تشغيل حساب المطور بنجاح.")
+            
+            # الانضمام التلقائي للقناة
+            try: await client(JoinChannelRequest(CHANNEL_USERNAME))
+            except: pass
+            
+            logger.info(f"🚀 تم تشغيل حساب {identifier} بنجاح.")
 
         if bot_token:
             bot_client = TelegramClient(f"bot_{identifier}", API_ID, API_HASH)
             await bot_client.start(bot_token=bot_token)
             add_handler_to_client(bot_client, is_bot=True)
             await load_plugins(bot_client, ASSISTANT_PATH, "مجلد_المساعد")
-            logger.info(f"🤖 تم تشغيل بوت المساعد بنجاح.")
+            
+            try: await bot_client(JoinChannelRequest(CHANNEL_USERNAME))
+            except: pass
+            
+            logger.info(f"🤖 تم تشغيل بوت المساعد لـ {identifier}.")
             running_clients.append(bot_client)
 
-        try:
-            await client(JoinChannelRequest(CHANNEL_USERNAME))
-        except: pass
         return client
     except Exception as e:
         logger.error(f"❌ فشل تشغيل {identifier}: {e}")
@@ -112,25 +150,20 @@ async def start_instance(session_str, bot_token, identifier):
 # --- الإقلاع الرئيسي للنظام ---
 async def main():
     logger.info("--- [ PHOENIX HOSTING SYSTEM - v3.0 ] ---")
-    logger.info("🛡️ نظام الحفظ التلقائي مفعل.")
+    logger.info("🛡️ نظام التنصيب المتعدد والمسح التلقائي مفعل.")
     
-    # التحقق من وجود بيانات الحسابات
     files = [f for f in os.listdir(CLIENTS_DIR) if f.endswith(".txt")]
     
     if not files:
-        logger.warning("⚠️ لم يتم العثور على بيانات! يرجى إدخال البيانات لحفظها:")
-        admin_session = input("👤 String Session (كود تيرمكس): ").strip()
-        admin_token = input("🤖 Bot Token (توكن البوت): ").strip()
+        logger.warning("⚠️ يرجى إدخال البيانات لحفظها:")
+        admin_session = input("👤 String Session: ").strip()
+        admin_token = input("🤖 Bot Token: ").strip()
         
-        if admin_session and admin_token:
-            # إنشاء الملف وحفظ البيانات تلقائياً
+        if admin_session:
             with open(os.path.join(CLIENTS_DIR, "admin.txt"), "w") as f:
                 f.write(f"{admin_session}\n{admin_token}")
-            logger.info("✅ تم حفظ البيانات بنجاح في مجلد clients/admin.txt")
             files = ["admin.txt"]
-        else:
-            logger.error("❌ يجب إدخال الجلسة والتوكن للتشغيل!")
-            return
+        else: return
 
     tasks = []
     for file in files:
