@@ -1,37 +1,43 @@
+# --- Telethon Base ---
+telethon==1.31.0
+
 # --- Speed & Performance ---
 cryptg
 tgcrypto
 uvloop; sys_platform != 'win32'
 
-# --- Task Scheduling ---
-apscheduler
-
-# --- System & Utilities ---
-colorama
-pydantic
-speedtest-cli
-gdown
-# مكاتب إضافية للتشغيل المطور
+# --- Database & Storage ---
 aiosqlite
-pathlib
-
-# --- Database Extension ---
 sqlalchemy
 sqlalchemy-utils
 
-# --- Base & Features ---
-telethon==1.31.0
-Pillow
-requests
-GitPython
-pyrogram
-pytz
+# --- HTTP & Networking ---
 aiohttp
-python-telegram-bot
-phonenumbers
+requests
+pysocks
+gdown
+
+# --- Image & File Handling ---
+Pillow
+python-magic
 hachoir
 beautifulsoup4
-async_generator
-# مكاتب ضرورية للأوامر الجديدة
-python-magic
+bs4
+
+# --- System & Utilities ---
 psutil
+speedtest-cli
+GitPython
+pydantic
+pytz
+colorama
+apscheduler
+async_generator
+
+# --- Telegram extras (optional but safe) ---
+pyrogram
+python-telegram-bot
+
+# --- Other useful libs ---
+phonenumbers
+pathlib
