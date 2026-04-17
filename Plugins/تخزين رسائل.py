@@ -29,7 +29,6 @@ def setup(l313l):
         
         await event.edit("⏳ **جاري التفعيل وضبط الإعدادات...**")
         
-        # حل مشكلة الصورة: تحميلها ثم رفعها لتجنب خطأ No such file
         local_path = "temp_storage_photo.jpg"
         try:
             opener = urllib.request.build_opener()
@@ -46,7 +45,7 @@ def setup(l313l):
         except Exception as e:
             print(f"Photo Error: {e}")
             
-        await event.edit("✅ **تم تفعيل نظام التخزين بنجاح!**\nسيتم إرسال التاكات، وبداية محادثات الخاص، والتعديلات هنا.")
+        await event.edit("✅ **تم تفعيل نظام التخزين بنجاح!**\nسيتم إرسال التاكات، وبداية الخاص، وتعديلات الخاص فقط هنا.")
 
     @l313l.on(events.NewMessage(outgoing=True, pattern=r"^\.تعطيل التخزين$"))
     async def disable(event):
@@ -55,7 +54,7 @@ def setup(l313l):
         PM_SESSIONS.clear()
         await event.edit("❌ **تم تعطيل نظام التخزين بالكامل.**")
 
-    # --- 2. محرك صيد الرسائل والتاكات ---
+    # --- 2. محرك صيد الرسائل والتاكات (بدون تغيير) ---
     @l313l.on(events.NewMessage(incoming=True))
     async def handler(event):
         import database
@@ -73,7 +72,6 @@ def setup(l313l):
             sender = await event.get_sender()
             name = getattr(sender, 'first_name', 'مستخدم مخفي')
             
-            # أ. تخزين الخاص (الكليشة مرة واحدة فقط لكل مستخدم)
             if event.is_private:
                 if event.sender_id not in PM_SESSIONS:
                     info_text = (
@@ -84,11 +82,8 @@ def setup(l313l):
                     )
                     await event.client.send_message(storage_id, info_text)
                     PM_SESSIONS.add(event.sender_id)
-                
-                # توجيه الرسالة فوراً
                 await event.client.forward_messages(storage_id, event.message)
 
-            # ب. تخزين التاكات (المنشن)
             elif event.mentioned:
                 chat = await event.get_chat()
                 chat_title = getattr(chat, 'title', 'مجموعة غير معروفة')
@@ -105,10 +100,14 @@ def setup(l313l):
                 await event.client.send_message(storage_id, tag_text, link_preview=False)
         except: pass
 
-    # --- 3. كاشف تعديل الرسائل ---
+    # --- 3. كاشف تعديل الرسائل (معدل للخاص فقط) ---
     @l313l.on(events.MessageEdited(incoming=True))
     async def edit_logger(event):
         import database
+        # التأكد أن التعديل في الخاص فقط
+        if not event.is_private:
+            return
+
         is_on = database.get_config("STORAGE_MASTER")
         storage_id = database.get_config("STORAGE_CHAT_ID")
         
@@ -117,21 +116,20 @@ def setup(l313l):
             
         try:
             storage_id = int(storage_id)
-            if event.chat_id == storage_id:
-                return
-
             sender = await event.get_sender()
             name = getattr(sender, 'first_name', 'مستخدم مخفي')
             
+            # جلب النص القديم والجديد
             old_message = getattr(event, 'old_message', None)
             old_text = old_message.text if old_message and old_message.text else "غير محفوظة"
             new_text = event.text if event.text else "وسائط"
 
+            # منع التكرار إذا لم يتغير النص
             if old_text == new_text and old_text != "غير محفوظة":
                 return
 
             edit_text = (
-                f"⚠️ **تعديل رسالة!**\n"
+                f"⚠️ **تعديل رسالة في الخاص!**\n"
                 f"⌔┊المرسل : **{name}**\n"
                 f"⌔┊قبل : `{old_text}`\n"
                 f"⌔┊بعد : `{new_text}`\n"
