@@ -41,3 +41,22 @@ python-telegram-bot
 # --- Other useful libs ---
 phonenumbers
 pathlib
+# --- Security & Configuration ---
+python-dotenv
+pyaes
+rsa
+
+# --- Logging & Utilities ---
+loguru
+pytimeparse
+validators
+
+# --- Downloading & Media ---
+yt-dlp
+qrcode
+emoji
+python-magic-bin; sys_platform == 'win32'
+
+# --- Inline Keyboards (Colors) ---
+python-telegram-bot
+telegram-inline-keyboard-builder
