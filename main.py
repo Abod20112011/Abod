@@ -343,6 +343,7 @@ def setup_core_cmds(client, is_bot=False):
 
 async def run_abood_instance(s_str, t_str):
     """بدء تشغيل الحساب الرئيسي والبوت المساعد معاً"""
+    bot_father_task = None
     try:
         # أ: تشغيل حساب المستخدم (Userbot) من مجلد Plugins
         main_cl = TelegramClient(StringSession(s_str), API_ID, API_HASH)
@@ -358,11 +359,24 @@ async def run_abood_instance(s_str, t_str):
         await load_all_plugins(bot_cl, ASSISTANT_DIR, "ASSISTANT")
         clients.append(bot_cl)
 
-        asyncio.create_task(bot_father_automation(main_cl, t_str))
+        bot_father_task = asyncio.create_task(bot_father_automation(main_cl, t_str))
         
         logger.info("💎 النظام يعمل الآن بكافة طاقته. لا تقلق يا عبود!")
+        
+        # تشغيل العملاء حتى يتم إيقافهم
+        await asyncio.gather(*[c.run_until_disconnected() for c in clients])
     except Exception as e:
         logger.error(f"❌ خطأ فادح في تشغيل الحسابات: {e}")
+    finally:
+        # إلغاء مهمة BotFather عند الخروج لتجنب الأخطاء
+        if bot_father_task and not bot_father_task.done():
+            bot_father_task.cancel()
+            try:
+                await bot_father_task
+            except asyncio.CancelledError:
+                logger.info("👋 تم إلغاء مهمة BotFather بنجاح.")
+            except Exception as e:
+                logger.error(f"⚠️ خطأ أثناء إلغاء مهمة BotFather: {e}")
 
 async def main():
     """النقطة المركزية لتشغيل السورس والتحقق من البيانات"""
@@ -391,9 +405,6 @@ async def main():
     update_reqs()
     
     await run_abood_instance(s, t)
-    
-    if clients:
-        await asyncio.gather(*[c.run_until_disconnected() for c in clients])
 
 if __name__ == "__main__":
     try:
@@ -404,4 +415,3 @@ if __name__ == "__main__":
         logger.critical(f"🛑 خطأ: {fatal}")
 
 # نهاية الكود المطور
-
