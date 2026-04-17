@@ -6,16 +6,17 @@ from git import Repo
 from git.exc import GitCommandError, InvalidGitRepositoryError, NoSuchPathError
 from telethon import events
 
-# --- الإعدادات ---
+# --- الإعدادات الخاصة بعبود ---
 GITHUB_REPO_URL = "https://github.com/Abod20112011/Abod.git"
-UPSTREAM_REPO_BRANCH = "main"  # تأكد أنه main في مستودعك
+UPSTREAM_REPO_BRANCH = "main" 
 
 def restart_bot():
-    """إعادة تشغيل البوت بالكامل"""
+    """إعادة تشغيل البوت لتطبيق التحديثات"""
+    # في الهوست، إعادة تشغيل ملف main.py يضمن تنفيذ setup.sh مجدداً
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 async def gen_chlog(repo, diff):
-    """توليد سجل التغييرات (الملفات المحدثة)"""
+    """توليد سجل الملفات التي تم تغييرها في GitHub"""
     d_form = "%d/%m/%y"
     return "".join(
         f" • {c.message} [{c.author}]\n ({c.committed_datetime.strftime(d_form)})\n"
@@ -48,6 +49,7 @@ def setup(client):
         if not changelog:
             return await event.edit("**✧︙ لا توجد تحديثات جديدة حالياً، السورس محدث!**")
         
+        # عرض سجل التغييرات والملفات المحدثة كما طلبت
         changelog_str = f"**✧︙ تـحديثـات جـديـدة مـتـوفـرة لـسـورس عـبـود:**\n\n{changelog}"
         changelog_str += f"\n\n**⌔ لـتـحديث الـبوت الآن ارسل:** `.تحديث الان`"
         
@@ -55,7 +57,8 @@ def setup(client):
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تحديث الان$"))
     async def perform_update(event):
-        await event.edit("ᯓ **𝗦𝗢𝗨𝗥𝗖𝗘 𝗔𝗕𝗢𝗗** 🝢 **تـحـديـث الـبـوت**\n%𝟸𝟶 ▬▬▭▭▭▭▭▭▭▭")
+        # شريط التحميل بالنسب المئوية كما طلبت
+        zzz = await event.edit("ᯓ **𝗦𝗢𝗨𝗥𝗖𝗘 𝗔𝗕𝗢𝗗** 🝢 **تـحـديـث الـبـوت**\n**•─────────────────•**\n%𝟸𝟶 ▬▬▭▭▭▭▭▭▭▭")
         await asyncio.sleep(1)
         
         try:
@@ -63,18 +66,18 @@ def setup(client):
             ups_rem = repo.remote("upstream")
             ups_rem.fetch(UPSTREAM_REPO_BRANCH)
             
-            await event.edit("ᯓ **𝗦𝗢𝗨𝗥𝗖𝗘 𝗔𝗕𝗢𝗗** 🝢 **تـحـديـث الـبـوت**\n%𝟻𝟶 ▬▬▬▬▬▭▭▭▭▭")
+            await zzz.edit("ᯓ **𝗦𝗢𝗨𝗥𝗖𝗘 𝗔𝗕𝗢𝗗** 🝢 **تـحـديـث الـبـوت**\n**•─────────────────•**\n%𝟻𝟶 ▬▬▬▬▬▭▭▭▭▭")
             
-            # السحب الإجباري للتحديثات
+            # تحديث الملفات إجبارياً لمطابقة GitHub
             repo.git.reset("--hard", f"upstream/{UPSTREAM_REPO_BRANCH}")
             
-            await event.edit("ᯓ **𝗦𝗢𝗨𝗥𝗖𝗘 𝗔𝗕𝗢𝗗** 🝢 **تـحـديـث الـبـوت**\n%𝟾𝟶 ▬▬▬▬▬▬▬▬▭▭")
+            await zzz.edit("ᯓ **𝗦𝗢𝗨𝗥𝗖𝗘 𝗔𝗕𝗢𝗗** 🝢 **تـحـديـث الـبـوت**\n**•─────────────────•**\n%𝟾𝟶 ▬▬▬▬▬▬▬▬▭▭")
             
-            # تحديث المكاتب إذا وجد ملف requirements
+            # تحديث المكاتب إذا وجد ملف requirements.txt
             if os.path.exists("requirements.txt"):
                 subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
             
-            await event.edit("ᯓ **𝗦𝗢𝗨𝗥𝗖𝗘 𝗔𝗕𝗢𝗗** 🝢 **تـحـديـث الـبـوت**\n%𝟷𝟶𝟶 ▬▬▬▬▬▬▬▬▬▬💯")
+            await zzz.edit("ᯓ **𝗦𝗢𝗨𝗥𝗖𝗘 𝗔𝗕𝗢𝗗** 🝢 **تـحـديـث الـبـوت**\n**•─────────────────•**\n%𝟷𝟶𝟶 ▬▬▬▬▬▬▬▬▬▬💯")
             await asyncio.sleep(1)
             
             await event.edit("**✨ تـم تـحديث سـورس عـبـود بـنـجاح! جـاري إعـادة الـتشغـيل...**")
