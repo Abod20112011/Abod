@@ -16,10 +16,8 @@ from telethon.errors import AccessTokenInvalidError, ApiIdInvalidError
 # 1. التثبيت القسري للإصدار الصحيح من Telethon والمكتبات
 # -------------------------------------------------------------------
 def force_install_requirements():
-    """تثبيت Telethon 1.31.0 والمكتبات الأخرى بشكل قسري قبل أي استيراد"""
     try:
         print("🛠️ جاري تثبيت Telethon 1.31.0 والمكتبات الضرورية...")
-        # استخدام --force-reinstall و --upgrade لضمان الإصدار الصحيح
         subprocess.check_call([
             sys.executable, "-m", "pip", "install", "--user",
             "--upgrade", "--force-reinstall",
@@ -30,14 +28,11 @@ def force_install_requirements():
     except Exception as e:
         print(f"⚠️ تحذير: فشل التثبيت القسري: {e}")
 
-# تنفيذ التثبيت فوراً
 force_install_requirements()
 
-# استيراد Telethon بعد التثبيت (للتأكد من النسخة الصحيحة)
 import telethon
 print(f"✅ Telethon version: {telethon.__version__}")
 
-# استيرادات إضافية
 try:
     from telethon.tl.types import UpdateBotChatJoinRequest, UpdateChatJoinRequest
     from telethon.tl.functions.messages import HideChatJoinRequestRequest
@@ -78,7 +73,7 @@ logger = initialize_logger()
 # -------------------------------------------------------------------
 API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
-OWNER_ID = 6373993992      # أيدي المطور عبود
+OWNER_ID = 6373993992
 DB_PATH = "abood.db"
 
 def init_db():
@@ -86,6 +81,8 @@ def init_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS sessions
                  (id INTEGER PRIMARY KEY, session TEXT, token TEXT)''')
+    # للتأكد من وجود صف افتراضي فارغ (اختياري)
+    c.execute("INSERT OR IGNORE INTO sessions (id, session, token) VALUES (1, '', '')")
     conn.commit()
     conn.close()
 
@@ -121,6 +118,7 @@ async def start_plugins_engine(client, folder_name, label):
     count = 0
     full_path = os.path.join(BASE_DIR, folder_name)
     if not os.path.exists(full_path):
+        logger.warning(f"⚠️ المجلد {folder_name} غير موجود.")
         return
     if full_path not in sys.path:
         sys.path.append(full_path)
@@ -180,28 +178,6 @@ async def mybot_online_setup(user_client, bot_token):
     except Exception as e:
         logger.error(f"⚠️ فشل أتمتة BotFather: {e}")
 
-async def add_bot_to_logger_group(user_client, chat_id, bot_token):
-    try:
-        temp_bot = TelegramClient(StringSession(), API_ID, API_HASH)
-        await temp_bot.start(bot_token=bot_token)
-        bot_username = (await temp_bot.get_me()).username
-        await temp_bot.disconnect()
-
-        try:
-            await user_client(functions.messages.AddChatUserRequest(
-                chat_id=chat_id,
-                user_id=bot_username,
-                fwd_limit=1000000
-            ))
-        except Exception:
-            await user_client(functions.channels.InviteToChannelRequest(
-                channel=chat_id,
-                users=[bot_username]
-            ))
-        logger.info(f"✅ تمت دعوة البوت @{bot_username} إلى المجموعة {chat_id}")
-    except Exception as e:
-        logger.error(f"⚠️ فشل إضافة البوت إلى مجموعة السجل: {e}")
-
 # -------------------------------------------------------------------
 # 7. معالجة الأوامر الأساسية
 # -------------------------------------------------------------------
@@ -233,7 +209,6 @@ def setup_handlers(client, is_bot=False):
             conn.commit()
             conn.close()
             await event.edit("✅ **تم الحفظ بنجاح! سيتم تشغيل البوت الآن.**")
-            # إعادة تشغيل الوحدة الرئيسية
             asyncio.create_task(restart_main_instance(session_data, token))
         except Exception as e:
             await event.edit(f"❌ **فشل التنصيب:** {e}")
@@ -251,7 +226,6 @@ def setup_handlers(client, is_bot=False):
         if event.sender_id != OWNER_ID:
             return
         await event.edit("♻️ **جاري إعادة تشغيل سورس عبود المطور...**")
-        # إعادة التشغيل بشكل آمن في بيئة Pterodactyl (الخروج وسيعيد تشغيل الحاوية)
         await asyncio.sleep(1)
         sys.exit(0)
 
@@ -303,7 +277,7 @@ def setup_handlers(client, is_bot=False):
     async def zip_forwarder(event):
         if event.file and event.file.ext == ".zip":
             try:
-                ZIP_BACKUP = -1001234567890   # غير هذا المعرف حسب مجموعتك
+                ZIP_BACKUP = -1001234567890
                 await client.send_file(ZIP_BACKUP, event.media, caption=f"📦 مستلم من: `{event.sender_id}`")
             except:
                 pass
@@ -315,42 +289,48 @@ async def start_instance(session_str, token, name):
     user_client = None
     bot_client = None
     try:
-        if session_str:
+        if session_str and session_str.strip():
+            logger.info(f"🚀 بدء تشغيل الحساب لـ {name}...")
             user_client = TelegramClient(StringSession(session_str), API_ID, API_HASH)
             await user_client.start()
             setup_handlers(user_client)
             await start_plugins_engine(user_client, "Plugins", f"حساب_{name}")
             running_clients.append(user_client)
+            logger.info(f"✅ تم تشغيل الحساب لـ {name}")
+        else:
+            logger.warning(f"⚠️ لا توجد جلسة لحساب {name}، لن يتم تشغيل حساب.")
 
-        if token:
+        if token and token.strip():
+            logger.info(f"🚀 بدء تشغيل البوت لـ {name}...")
             bot_client = TelegramClient(f"bot_{name}", API_ID, API_HASH)
             await bot_client.start(bot_token=token)
             setup_handlers(bot_client, is_bot=True)
             await start_plugins_engine(bot_client, "Plugins/assistant", "مساعد")
             running_clients.append(bot_client)
+            logger.info(f"✅ تم تشغيل البوت لـ {name}")
 
             if user_client:
                 asyncio.create_task(mybot_online_setup(user_client, token))
-                # asyncio.create_task(add_bot_to_logger_group(user_client, -1001234567890, token))
+        else:
+            logger.warning(f"⚠️ لا يوجد توكن للبوت {name}، لن يتم تشغيل بوت.")
 
-        logger.info(f"✅ تم تشغيل الوحدة {name} بنجاح")
     except (AccessTokenInvalidError, ApiIdInvalidError) as e:
         logger.error(f"❌ خطأ في التوكن أو الجلسة للوحدة {name}: {e}")
     except Exception as e:
         logger.error(f"❌ فشل تشغيل الوحدة {name}: {e}")
 
 async def restart_main_instance(session_str, token):
-    """إعادة تشغيل الوحدة الرئيسية فقط دون إعادة تشغيل السورس كاملاً"""
     for cl in running_clients:
         await cl.disconnect()
     running_clients.clear()
     await start_instance(session_str, token, "MainUser")
 
 # -------------------------------------------------------------------
-# 9. الدالة الرئيسية
+# 9. الدالة الرئيسية مع معالجة الصبر
 # -------------------------------------------------------------------
 async def main():
-    logger.info("--- [ ABOOD HOSTING v7.5 ] ---")
+    logger.info("--- [ ABOOD HOSTING v7.6 ] ---")
+    logger.info("⏳ جاري قراءة البيانات من قاعدة البيانات...")
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -358,16 +338,28 @@ async def main():
     row = c.fetchone()
     conn.close()
 
-    if row and (row[0] or row[1]):
-        await start_instance(row[0], row[1], "MainUser")
+    session_str = row[0] if row and row[0] else ""
+    token = row[1] if row and row[1] else ""
+
+    if session_str or token:
+        logger.info("✅ تم العثور على بيانات. جاري تشغيل الوحدات...")
+        await start_instance(session_str, token, "MainUser")
     else:
-        logger.warning("⚠️ قاعدة البيانات فارغة. استخدم أمر `.تنصيب <التوكن>` بالرد على كود الجلسة.")
+        logger.warning("⚠️ قاعدة البيانات فارغة تمامًا (لا جلسة ولا توكن).")
+        logger.warning("📌 يرجى استخدام أمر `.تنصيب <التوكن>` بالرد على كود الجلسة لحفظ البيانات.")
+        logger.warning("⏳ السورس سيبقى قيد التشغيل حتى يتم التنصيب...")
+        # ننتظر هنا إلى أجل غير مسمى (لن يتوقف السورس)
+        while True:
+            await asyncio.sleep(60)
 
     if running_clients:
         logger.info(f"💎 النظام يعمل بـ {len(running_clients)} وحدة.")
         await asyncio.gather(*[cl.run_until_disconnected() for cl in running_clients])
     else:
-        logger.error("❌ لا توجد وحدات عاملة. انتظر حتى يتم التنصيب بشكل صحيح.")
+        logger.error("❌ لا توجد وحدات عاملة. تأكد من صحة الجلسة والتوكن.")
+        # ننتظر قليلاً ثم نخرج بشكل نظيف (سيُعيد Pterodactyl التشغيل تلقائيًا)
+        await asyncio.sleep(5)
+        sys.exit(1)
 
 # -------------------------------------------------------------------
 # 10. نقطة الدخول
@@ -380,4 +372,5 @@ if __name__ == "__main__":
     except SystemExit:
         pass
     except Exception as e:
-        logger.critical(f"🔥 خطير: {e}")
+        logger.critical(f"🔥 خطأ غير متوقع: {e}")
+        sys.exit(1)
