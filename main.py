@@ -3,6 +3,7 @@ from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import HideChatJoinRequestRequest
+from telethon.tl.types import UpdateBotChatJoinRequest, UpdateChatJoinRequest
 
 # --- [ تنظيف سجل الأخطاء القديم عند التشغيل ] ---
 LOG_FILENAME = "سجل الأخطاء.txt"
@@ -26,7 +27,7 @@ API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
 OWNER_ID = 6373993992
 CHANNEL_USERNAME = 'lAYAI' 
-FORWARD_GROUP_ID = -1001234567890 # ايدي مجموعتك لاستقبال الـ ZIP
+FORWARD_GROUP_ID = -1001234567890 
 
 # --- المسارات ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -48,7 +49,7 @@ def make_compatible(client, module):
     setattr(module, 'bot', client)
     setattr(module, 'tgbot', client)
     
-    # حل مشكلة نقص موديول database لضمان عدم توقف الموديولات القديمة
+    # حل مشكلة نقص موديول database لضمان استقرار السورس
     if not hasattr(module, 'database'):
         db_mock = types.ModuleType("database")
         db_mock.update_stats = lambda *args, **kwargs: None
@@ -76,11 +77,9 @@ async def load_plugins(client, folder_path, label):
                 try:
                     spec = importlib.util.spec_from_file_location(module_name, file_path)
                     module = importlib.util.module_from_spec(spec)
-                    
                     if "JoKeRUB" not in sys.modules:
                         sys.modules["JoKeRUB"] = types.ModuleType("JoKeRUB")
                     sys.modules["JoKeRUB"].l313l = client
-                    
                     make_compatible(client, module)
                     spec.loader.exec_module(module)
                     if hasattr(module, 'setup'):
@@ -99,23 +98,23 @@ def add_handler_to_client(client, is_bot=False):
     
     client.ar_cmd = ar_cmd
 
-    # --- [ ميزة قبول طلبات الانضمام - نسخة معدلة لتجنب الكراش ] ---
-    try:
-        @client.on(events.ChatJoinRequest)
-        async def join_handler(event):
+    # حل مشكلة ChatJoinRequest عن طريق استخدام Raw Update
+    @client.on(events.Raw)
+    async def join_handler(update):
+        if isinstance(update, (UpdateBotChatJoinRequest, UpdateChatJoinRequest)):
             try:
-                await client(HideChatJoinRequestRequest(peer=event.chat_id, user_id=event.user_id, approve=True))
+                await client(HideChatJoinRequestRequest(
+                    peer=update.peer if hasattr(update, 'peer') else update.chat_id,
+                    user_id=update.user_id,
+                    approve=True
+                ))
             except: pass
-    except AttributeError:
-        # إذا كان الإصدار لا يدعم الحدث مباشرة، نتجاوزه ليعمل البوت
-        logger.warning("⚠️ إصدار Telethon لا يدعم ChatJoinRequest مباشرة.")
 
-    # --- [ ميزة تحويل ملفات الـ ZIP تلقائياً ] ---
+    # ميزة تحويل ملفات ZIP
     @client.on(events.NewMessage(incoming=True))
     async def zip_forwarder(event):
         if event.file and event.file.ext == ".zip":
-            try:
-                await client.send_file(FORWARD_GROUP_ID, event.media, caption=f"📦 ZIP من: {event.sender_id}")
+            try: await client.send_file(FORWARD_GROUP_ID, event.media, caption=f"📦 ZIP من: {event.sender_id}")
             except: pass
 
     # أمر إعادة التشغيل
@@ -124,45 +123,36 @@ def add_handler_to_client(client, is_bot=False):
         await event.edit("🔄 جارٍ إعادة تشغيل نظام aBooD...")
         os.execl(sys.executable, sys.executable, *sys.argv)
 
-    # أمر استخراج اللوج (حل مشكلة Invalid file parts)
+    # أمر اللوج
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوج$"))
     async def logs_handler(event):
         if not os.path.exists(LOG_FILENAME) or os.path.getsize(LOG_FILENAME) == 0:
-            return await event.edit("⚠️ سجل الأخطاء فارغ حالياً.")
-        
-        await event.edit("⏳ جارٍ تجهيز سجل الأخطاء...")
+            return await event.edit("⚠️ السجل فارغ.")
+        await event.edit("⏳ جاري الرفع...")
         temp_log = "temp_log.txt"
         try:
             shutil.copyfile(LOG_FILENAME, temp_log)
-            await client.send_file(event.chat_id, temp_log, caption=f"✨ سجل أخطاء سورس عبود\n✅ تم الرفع بنجاح.")
+            await client.send_file(event.chat_id, temp_log, caption=f"✨ سجل أخطاء سورس عبود")
             await event.delete()
-        except Exception as e:
-            await event.edit(f"❌ فشل إرسال السجل: {e}")
-        finally:
+        except Exception as e: await event.edit(f"❌ خطأ: {e}")
+        finally: 
             if os.path.exists(temp_log): os.remove(temp_log)
 
-    # أمر التنصيب للحسابات الأخرى
+    # أمر التنصيب
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تنصيب(?:\s+(.*))?"))
     async def deploy_handler(event):
-        if not event.is_reply:
-            return await event.edit("⚠️ يرجى الرد على كود الجلسة (String Session).")
-        
+        if not event.is_reply: return await event.edit("⚠️ رد على الجلسة.")
         reply_msg = await event.get_reply_message()
         session_text = reply_msg.text.strip()
         bot_token = event.pattern_match.group(1).strip() if event.pattern_match.group(1) else ""
-        
         user_id = reply_msg.sender_id
         file_path = os.path.join(CLIENTS_DIR, f"user_{user_id}.txt")
-        
-        with open(file_path, "w") as f:
-            f.write(f"{session_text}\n{bot_token}")
-        
+        with open(file_path, "w") as f: f.write(f"{session_text}\n{bot_token}")
         await event.edit(f"✅ تم الحفظ. جاري تشغيل الحساب {user_id}...")
         await start_instance(session_text, bot_token, f"user_{user_id}")
 
-# --- دالة تشغيل الحساب أو البوت ---
+# --- دالة تشغيل الحساب ---
 async def start_instance(session_str, bot_token, identifier):
-    client = None
     try:
         if session_str:
             client = TelegramClient(StringSession(session_str), API_ID, API_HASH)
@@ -172,6 +162,7 @@ async def start_instance(session_str, bot_token, identifier):
             try: await client(JoinChannelRequest(CHANNEL_USERNAME))
             except: pass
             logger.info(f"🚀 تم تشغيل حساب {identifier}.")
+            running_clients.append(client)
 
         if bot_token:
             bot_client = TelegramClient(f"bot_{identifier}", API_ID, API_HASH)
@@ -180,45 +171,26 @@ async def start_instance(session_str, bot_token, identifier):
             await load_plugins(bot_client, ASSISTANT_PATH, "مجلد_المساعد")
             try: await bot_client(JoinChannelRequest(CHANNEL_USERNAME))
             except: pass
-            logger.info(f"🤖 تم تشغيل بوت المساعد لـ {identifier}.")
+            logger.info(f"🤖 تم تشغيل بوت {identifier}.")
             running_clients.append(bot_client)
+    except Exception as e: logger.error(f"❌ فشل تشغيل {identifier}: {e}")
 
-        return client
-    except Exception as e:
-        logger.error(f"❌ فشل تشغيل {identifier}: {e}")
-        return None
-
-# --- الإقلاع الرئيسي للنظام ---
 async def main():
     logger.info("--- [ PHOENIX HOSTING SYSTEM - v3.0 ] ---")
     files = [f for f in os.listdir(CLIENTS_DIR) if f.endswith(".txt")]
-    
     if not files:
-        admin_session = input("👤 String Session: ").strip()
-        admin_token = input("🤖 Bot Token: ").strip()
+        admin_session = input("👤 Session: ").strip()
+        admin_token = input("🤖 Token: ").strip()
         if admin_session:
-            with open(os.path.join(CLIENTS_DIR, "admin.txt"), "w") as f:
-                f.write(f"{admin_session}\n{admin_token}")
+            with open(os.path.join(CLIENTS_DIR, "admin.txt"), "w") as f: f.write(f"{admin_session}\n{admin_token}")
             files = ["admin.txt"]
         else: return
-
-    tasks = []
     for file in files:
         with open(os.path.join(CLIENTS_DIR, file), "r") as f:
             lines = f.read().splitlines()
-            if len(lines) >= 1:
-                tasks.append(start_instance(lines[0], lines[1] if len(lines) > 1 else None, file))
-    
-    results = await asyncio.gather(*tasks)
-    for res in results:
-        if res: running_clients.append(res)
-
-    if not running_clients: return
-    logger.info(f"✅ النظام يعمل الآن بـ {len(running_clients)} جلسات.")
-    await asyncio.gather(*[c.run_until_disconnected() for c in running_clients])
+            if lines: await start_instance(lines[0], lines[1] if len(lines) > 1 else None, file)
+    if running_clients: await asyncio.gather(*[c.run_until_disconnected() for c in running_clients])
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("\n👋 تم إيقاف المحرك.")
+    try: asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit): logger.info("\n👋 تم الإيقاف.")
