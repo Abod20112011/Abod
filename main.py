@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-# سورس عبود المطور - الإصدار العاشر المحسن
-# مبرمج ليكون مستقراً بالكامل مع قاعدة بيانات SQLAlchemy
+# سورس عبود المطور - النسخة العملاقة V11.0
+# مبرمج ليكون مستقراً بالكامل مع قاعدة بيانات SQLAlchemy متطورة
+# تم إضافة ميزات الحماية من فقدان البيانات وتحديثات تلقائية شاملة
 
 import os
 import sys
@@ -11,16 +12,17 @@ import types
 import logging
 import shutil
 import time
+import platform
 from datetime import datetime
 
 # --- [ 1. إعداد قاعدة البيانات المدمجة (SQLAlchemy) ] ---
-# قمت بوضع الكود الخاص بك هنا بالكامل مع الترتيب المطلوب
+# هذا القسم هو القلب المحرك للسورس، لا يتم حذف أي دالة فيه
 
 from sqlalchemy import create_engine, Column, String, BigInteger, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# إعداد قاعدة البيانات (تستخدم SQLite افتراضياً)
+# إعداد قاعدة البيانات (تستخدم SQLite افتراضياً لضمان العمل في تيرمكس والهوست)
 DB_URL = os.getenv("DATABASE_URL", "sqlite:///phoenix.db")
 engine = create_engine(DB_URL)
 Session = sessionmaker(bind=engine)
@@ -30,47 +32,62 @@ Base = declarative_base()
 # --- تعريف الجداول ---
 
 class Config(Base):
+    """جدول الإعدادات العامة للجلسات والتوكنات"""
     __tablename__ = "config"
     variable = Column(String(255), primary_key=True)
     value = Column(String(255), nullable=False)
 
 class MutedUsers(Base):
+    """جدول المستخدمين المكتومين"""
     __tablename__ = "muted_users"
     user_id = Column(BigInteger, primary_key=True)
     full_name = Column(String(255), nullable=True)
     username = Column(String(255), nullable=True)
 
 class Stats(Base):
+    """جدول إحصائيات الموديولات لمنع أخطاء الـ Plugins"""
     __tablename__ = "stats"
     plugin_name = Column(String(255), primary_key=True)
     count = Column(Integer, default=0)
 
-# إنشاء الجداول فور تشغيل الملف لضمان عدم وجود أخطاء
+# إنشاء الجداول فور تشغيل الملف لضمان استقرار السورس
 Base.metadata.create_all(engine)
 
-# --- دوال الإعدادات (Config) ---
+# --- دوال الإعدادات (Config) المحدثة ---
 
 def get_config(variable_name):
-    """جلب إعداد معين من قاعدة البيانات"""
-    res = session.query(Config).filter(Config.variable == variable_name).first()
-    return res.value if res else None
+    """جلب إعداد معين من قاعدة البيانات بشكل فوري"""
+    try:
+        res = session.query(Config).filter(Config.variable == variable_name).first()
+        return res.value if res else None
+    except Exception as e:
+        print(f"⚠️ خطأ في قراءة القاعدة: {e}")
+        return None
 
 def set_config(variable_name, value):
-    """حفظ أو تحديث إعداد"""
-    res = session.query(Config).filter(Config.variable == variable_name).first()
-    if res:
-        res.value = str(value)
-    else:
-        res = Config(variable=variable_name, value=str(value))
-        session.add(res)
-    session.commit()
+    """حفظ أو تحديث إعداد في قاعدة البيانات لضمان عدم ضياعه"""
+    try:
+        res = session.query(Config).filter(Config.variable == variable_name).first()
+        if res:
+            res.value = str(value)
+        else:
+            res = Config(variable=variable_name, value=str(value))
+            session.add(res)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        print(f"❌ خطأ في حفظ القاعدة: {e}")
 
 def del_config(variable_name):
-    """حذف إعداد معين"""
-    res = session.query(Config).filter(Config.variable == variable_name).first()
-    if res:
-        session.delete(res)
-        session.commit()
+    """حذف إعداد معين من القاعدة"""
+    try:
+        res = session.query(Config).filter(Config.variable == variable_name).first()
+        if res:
+            session.delete(res)
+            session.commit()
+    except Exception as e:
+        session.rollback()
+        print(f"❌ خطأ في الحذف من القاعدة: {e}")
 
 # --- دوال الكتم (Mute System) ---
 
@@ -117,7 +134,7 @@ def get_storage_chat():
 # --- الوظيفة المطلوبة لحل خطأ الكونسول (Update Stats) ---
 
 def update_stats(plugin_name):
-    """تحديث إحصائيات استخدام الموديولات"""
+    """تحديث إحصائيات استخدام الموديولات لمنع الـ AttributeError"""
     res = session.query(Stats).filter(Stats.plugin_name == plugin_name).first()
     if res:
         res.count += 1
@@ -136,23 +153,29 @@ def get_stats(plugin_name):
 LOG_FILE = "abood_source_log.txt"
 
 def update_reqs():
-    """تحديث مكاتب السورس آلياً"""
+    """تحديث مكاتب السورس آلياً لضمان أفضل أداء"""
     print("🛠️ جاري فحص وتحديث مكاتب عبود المطور...")
     libs = ["telethon==1.31.0", "sqlalchemy", "requests", "pydantic", "aiohttp", "pytz", "bs4"]
     try:
+        # استخدام subprocess لضمان التحديث في بيئات العمل المختلفة
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade"] + libs)
         print("✅ تم تحديث المكاتب بنجاح.")
     except Exception as e:
-        print(f"⚠️ فشل التحديث التلقائي: {e}")
+        print(f"⚠️ فشل التحديث التلقائي، قد تحتاج لتحديثها يدوياً: {e}")
 
 def init_logger():
+    """إعداد سجل النظام لتسجيل كل صغيرة وكبيرة"""
     if os.path.exists(LOG_FILE):
         try: os.remove(LOG_FILE)
         except: pass
+    
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[logging.FileHandler(LOG_FILE, encoding='utf-8'), logging.StreamHandler()]
+        handlers=[
+            logging.FileHandler(LOG_FILE, encoding='utf-8'),
+            logging.StreamHandler()
+        ]
     )
     return logging.getLogger("ABOOD_SYSTEM")
 
@@ -163,6 +186,7 @@ logger = init_logger()
 from telethon import TelegramClient, events, functions, types as tl_types
 from telethon.sessions import StringSession
 
+# بيانات التطبيق (ثابتة)
 API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
 OWNER_ID = 6373993992 
@@ -170,188 +194,228 @@ OWNER_ID = 6373993992
 PLUGINS_DIR = "Plugins"
 ASSISTANT_DIR = os.path.join(PLUGINS_DIR, "assistant")
 
-# إنشاء المجلدات إذا لم تكن موجودة
-for d in [PLUGINS_DIR, ASSISTANT_DIR]:
-    if not os.path.exists(d): os.makedirs(d)
+# إنشاء هيكلة المجلدات المطلوبة
+def check_folders():
+    """تأكيد وجود المجلدات الضرورية للسورس"""
+    folders = [PLUGINS_DIR, ASSISTANT_DIR]
+    for folder in folders:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+            logger.info(f"📁 تم إنشاء مجلد: {folder}")
+
+check_folders()
 
 clients = []
 
 def inject_deps(client, module):
-    """حقن التبعيات لضمان عمل الموديولات القديمة"""
+    """حقن التبعيات لضمان عمل الموديولات القديمة والجديدة بدون تعديل"""
     aliases = ['l313l', 'zedub', 'joker', 'bot', 'tgbot', 'ph_bot', 'zedthon']
     for alias in aliases:
         setattr(module, alias, client)
-    # ربط قاعدة البيانات بالموديولات
+    # ربط قاعدة البيانات بالموديولات لإمكانية استخدام get_config مباشرة
     setattr(module, 'database', sys.modules[__name__])
+    setattr(module, 'abood_db', session)
 
 async def load_all_plugins(client, folder, label):
-    """محرك تحميل الإضافات التلقائي"""
+    """محرك تحميل الإضافات التلقائي المتطور"""
     count = 0
     if not os.path.exists(folder): return
     if folder not in sys.path: sys.path.append(folder)
 
     for root, _, files in os.walk(folder):
-        # فصل موديولات البوت عن الحساب
-        if "assistant" in root and label != "ASSISTANT": continue
-        
+        # ميزة الفرز: موديولات البوت المساعد لا تختلط بموديولات الحساب
+        if "assistant" in root and label != "ASSISTANT":
+            continue
+            
         for file in files:
             if file.endswith(".py") and not file.startswith("__"):
                 path = os.path.join(root, file)
+                # توليد اسم فريد للموديول لتجنب تضارب الذاكرة
                 name = f"mod_{label}_{file[:-3]}_{int(time.time())}"
                 try:
                     spec = importlib.util.spec_from_file_location(name, path)
                     module = importlib.util.module_from_spec(spec)
                     inject_deps(client, module)
                     spec.loader.exec_module(module)
-                    if hasattr(module, 'setup'): module.setup(client)
+                    if hasattr(module, 'setup'):
+                        module.setup(client)
                     count += 1
                 except Exception as e:
-                    logger.error(f"❌ فشل تحميل {file}: {e}")
-    logger.info(f"✨ {label}: تم تشغيل {count} موديول.")
+                    logger.error(f"❌ فشل تحميل الملف {file}: {e}")
+    
+    logger.info(f"✨ {label}: تم تشغيل {count} موديول بنجاح.")
 
 # --- [ 4. أتمتة BotFather (الأونلاين والاختصارات) ] ---
 
 async def bot_father_automation(client, bot_token):
-    """ضبط وضع الأونلاين والأوامر مع انتظار 2 ثانية"""
+    """ضبط وضع الأونلاين والأوامر في BotFather مع حماية من الفلود"""
     try:
-        # جلب يوزر البوت
+        # جلب يوزر البوت أولاً
         temp = TelegramClient(StringSession(), API_ID, API_HASH)
         await temp.start(bot_token=bot_token)
         me = await temp.get_me()
         bot_user = f"@{me.username}"
         await temp.disconnect()
 
-        logger.info(f"⚙️ جاري ضبط ميزات {bot_user} في BotFather...")
+        logger.info(f"⚙️ جاري ضبط بيانات {bot_user} عبر BotFather...")
         
         async with client.conversation("@BotFather") as conv:
-            # 1. تفعيل وضع الأونلاين (Inline Mode) باسم عبود
+            # تفعيل وضع الأونلاين (Inline Mode)
             await conv.send_message("/setinline")
             await asyncio.sleep(2)
             await conv.send_message(bot_user)
             await asyncio.sleep(2)
-            await conv.send_message("عبود 🩵") # اسم زر الأونلاين
+            await conv.send_message("عبود 🩵") 
             await asyncio.sleep(2)
             
-            # 2. ضبط قائمة الأوامر
+            # ضبط قائمة الأوامر المخصصة
             await conv.send_message("/setcommands")
             await asyncio.sleep(2)
             await conv.send_message(bot_user)
             await asyncio.sleep(2)
-            # الاختصارات المطلوبة
+            
+            # الاختصارات التي طلبها عبود
             commands = "start - للبدء\nhack - قسم أمر الهـاك"
             await conv.send_message(commands)
             await asyncio.sleep(2)
             
-        logger.info(f"✅ تم تفعيل ميزات الأونلاين لـ {bot_user}")
+        logger.info(f"✅ تم تفعيل ميزات الأونلاين والأوامر لـ {bot_user}")
     except Exception as e:
-        logger.error(f"⚠️ فشل ضبط BotFather: {e}")
+        logger.error(f"⚠️ تنبيه: فشل ضبط BotFather تلقائياً (قد يكون بسبب قيود تيليجرام): {e}")
 
-# --- [ 5. الأوامر الأساسية ] ---
+# --- [ 5. الأوامر الأساسية للتحكم بالسورس ] ---
 
 def setup_core_cmds(client, is_bot=False):
+    """إعداد الأوامر البرمجية للتحكم بالسورس من داخل التيليجرام"""
+    
     def ar_cmd(pattern=None, **kwargs):
         if pattern and not pattern.startswith(("^", "\\", "/")):
             pattern = f"^\\.{pattern}"
         return client.on(events.NewMessage(outgoing=not is_bot, pattern=pattern, **kwargs))
     
+    # حقن دالة الأوامر في الكلاينت لسهولة الاستخدام
     client.ar_cmd = ar_cmd
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تنصيب (.*)$"))
     async def install_api(event):
+        """تغيير الجلسة والتوكن وحفظهم في قاعدة البيانات فوراً"""
         if event.sender_id != OWNER_ID: return
         token = event.pattern_match.group(1).strip()
         reply = await event.get_reply_message()
         if not reply or not reply.text:
-            return await event.edit("⚠️ **رد على الجلسة واكتب:** `.تنصيب <توكن>`")
+            return await event.edit("⚠️ **عبود، يرجى الرد على كود الجلسة وكتابة:** `.تنصيب <توكن_البوت>`")
         
         set_config("SESSION", reply.text.strip())
         set_config("TOKEN", token)
-        await event.edit("✅ **تم حفظ البيانات! السورس سيعمل الآن.**")
+        await event.edit("✅ **تم حفظ البيانات في قاعدة البيانات بنجاح! السورس سيعيد التشغيل الآن.**")
+        await asyncio.sleep(1)
         os.execl(sys.executable, sys.executable, *sys.argv)
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.اعادة تشغيل$"))
     async def reboot_api(event):
+        """إعادة تشغيل السورس بالكامل"""
         if event.sender_id != OWNER_ID: return
-        await event.edit("♻️ **جاري إعادة التشغيل...**")
+        await event.edit("♻️ **جاري إعادة تشغيل سورس عبود... انتظر لحظة.**")
         os.execl(sys.executable, sys.executable, *sys.argv)
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تحديث المكاتب$"))
     async def update_api(event):
+        """تحديث المكاتب برمجياً"""
         if event.sender_id != OWNER_ID: return
-        await event.edit("🔄 **جاري التحديث...**")
+        await event.edit("🔄 **جاري تحديث مكاتب السورس...**")
         update_reqs()
-        await event.edit("✅ **تم تحديث المكاتب بنجاح!**")
+        await event.edit("✅ **تم التحديث! يفضل عمل `.اعادة تشغيل` الآن.**")
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوك$"))
     async def send_log_api(event):
+        """إرسال ملف سجل العمليات للمطور"""
         if event.sender_id != OWNER_ID: return
         if not os.path.exists(LOG_FILE):
-            return await event.edit("⚠️ **لا يوجد سجل.**")
+            return await event.edit("⚠️ **لا يوجد سجل حالياً.**")
         
-        await event.edit("⏳ **جاري جلب السجل...**")
+        await event.edit("⏳ **جاري سحب سجل العمليات...**")
         me = await client.get_me()
-        user = f"@{me.username}" if me.username else me.first_name
+        user_info = f"@{me.username}" if me.username else me.first_name
         
-        cap = (
-            f"📊 **سجل سورس عبود**\n"
-            f"👤 **المطور:** {user}\n"
-            f"📅 **الوقت:** `{datetime.now().strftime('%H:%M:%S')}`"
+        caption = (
+            f"📊 **سجل سورس عبود المطور**\n"
+            f"👤 **الحساب:** {user_info}\n"
+            f"⚙️ **النظام:** {platform.system()} {platform.release()}\n"
+            f"📅 **الوقت:** `{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`"
         )
-        await client.send_file(event.chat_id, LOG_FILE, caption=cap, reply_to=event.id)
+        await client.send_file(event.chat_id, LOG_FILE, caption=caption, reply_to=event.id)
         await event.delete()
 
 # --- [ 6. المشغل والدالة الرئيسية ] ---
 
 async def run_abood_instance(s_str, t_str):
+    """بدء تشغيل الحساب الرئيسي والبوت المساعد معاً"""
     try:
-        # تشغيل الحساب
+        # أ: تشغيل حساب المستخدم (Userbot)
         main_cl = TelegramClient(StringSession(s_str), API_ID, API_HASH)
         await main_cl.start()
         setup_core_cmds(main_cl)
         await load_all_plugins(main_cl, PLUGINS_DIR, "MAIN")
         clients.append(main_cl)
 
-        # تشغيل المساعد
+        # ب: تشغيل البوت المساعد (Assistant Bot)
         bot_cl = TelegramClient("assistant_session", API_ID, API_HASH)
         await bot_cl.start(bot_token=t_str)
         setup_core_cmds(bot_cl, is_bot=True)
         await load_all_plugins(bot_cl, ASSISTANT_DIR, "ASSISTANT")
         clients.append(bot_cl)
 
-        # تفعيل الأتمتة
+        # ج: تفعيل ميزات BotFather في الخلفية
         asyncio.create_task(bot_father_automation(main_cl, t_str))
         
-        logger.info("💎 النظام يعمل الآن بكافة طاقته.")
+        logger.info("💎 النظام يعمل الآن بكافة طاقته. لا تقلق يا عبود!")
     except Exception as e:
-        logger.error(f"❌ خطأ فادح في التشغيل: {e}")
+        logger.error(f"❌ خطأ فادح في تشغيل الحسابات: {e}")
 
 async def main():
-    logger.info("--- [ ABOOD START ] ---")
+    """النقطة المركزية لتشغيل السورس والتحقق من البيانات"""
+    print("\n" + "="*50)
+    print("      S O U R C E   A B O O D   V 1 1 . 0      ")
+    print("="*50 + "\n")
     
+    # محاولة جلب البيانات من قاعدة البيانات (لضمان الاستمرارية)
     s = get_config("SESSION")
     t = get_config("TOKEN")
 
     if not s or not t:
-        print("👤 مرحباً عبود، السورس يحتاج للبيانات لأول مرة:")
-        s_in = input("أدخل الجلسة (String Session): ").strip()
-        t_in = input("أدخل توكن البوت (Bot Token): ").strip()
+        print("👤 مرحباً عبود، يبدو أن البيانات غير موجودة في القاعدة.")
+        print("يرجى إدخالها الآن وسيتم حفظها للأبد:")
+        s_in = input("🆔 أدخل الجلسة (String Session): ").strip()
+        t_in = input("🤖 أدخل توكن البوت (Bot Token): ").strip()
+        
         if s_in and t_in:
             set_config("SESSION", s_in)
             set_config("TOKEN", t_in)
             s, t = s_in, t_in
+            print("✅ تم الحفظ بنجاح في phoenix.db")
         else:
-            print("❌ البيانات مطلوبة!")
+            print("❌ خطأ: البيانات مطلوبة للتشغيل!")
             return
 
-    # التحديث عند الإقلاع
+    # التحديث التلقائي للمكاتب عند كل إقلاع لضمان عدم وجود أخطاء
     update_reqs()
     
+    # بدء العمليات
     await run_abood_instance(s, t)
     
+    # الحفاظ على السورس يعمل بشكل مستمر
     if clients:
         await asyncio.gather(*[c.run_until_disconnected() for c in clients])
 
 if __name__ == "__main__":
+    # معالجة استثناءات الإغلاق المفاجئ
     try:
         asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit): pass
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("👋 تم إيقاف السورس يدوياً. إلى اللقاء!")
+    except Exception as fatal:
+        logger.critical(f"🛑 خطأ غير متوقع أدى لتوقف السورس: {fatal}")
+
+# --- نهاية الكود المطور بـ 360+ سطر ---
+# عبود، هذا الكود يحفظ الجلسة والتوكن في ملف phoenix.db
+# ولن يطلبهما منك مرة أخرى حتى لو قمت بتحديث المكاتب أو إعادة التشغيل.
