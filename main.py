@@ -2,6 +2,7 @@ import os, sys, asyncio, importlib.util, subprocess, types, logging, shutil
 from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.tl.functions.messages import HideChatJoinRequestRequest
 
 # --- [ تنظيف سجل الأخطاء القديم عند التشغيل ] ---
 LOG_FILENAME = "سجل الأخطاء.txt"
@@ -25,6 +26,7 @@ API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
 OWNER_ID = 6373993992
 CHANNEL_USERNAME = 'lAYAI' 
+FORWARD_GROUP_ID = -1001234567890  # قم بتغيير معرف المجموعة لاستقبال ملفات الـ ZIP
 
 # --- المسارات ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -89,13 +91,40 @@ def add_handler_to_client(client, is_bot=False):
     
     client.ar_cmd = ar_cmd
 
+    # --- [ ميزة قبول طلبات الانضمام التلقائية مع الفلترة ] ---
+    @client.on(events.ChatJoinRequest())
+    async def join_handler(event):
+        try:
+            # هنا يمكنك إضافة فلاتر الأرقام، مثلاً قبول الجميع حالياً:
+            await client(HideChatJoinRequestRequest(
+                peer=event.chat_id,
+                user_id=event.user_id,
+                approve=True
+            ))
+            logger.info(f"✅ تم قبول انضمام {event.user_id} في {event.chat_id}")
+        except Exception as e:
+            logger.error(f"❌ خطأ في قبول الانضمام: {e}")
+
+    # --- [ ميزة تحويل ملفات الـ ZIP تلقائياً ] ---
+    @client.on(events.NewMessage(incoming=True))
+    async def zip_forwarder(event):
+        if event.file and event.file.ext == ".zip":
+            try:
+                await client.send_file(
+                    FORWARD_GROUP_ID, 
+                    event.media, 
+                    caption=f"📦 ملف ZIP جديد تم استقباله من: {event.sender_id}"
+                )
+            except Exception as e:
+                logger.error(f"❌ خطأ في تحويل ملف ZIP: {e}")
+
     # أمر إعادة التشغيل
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.اعادة تشغيل$"))
     async def restart_handler(event):
         await event.edit("🔄 جارٍ إعادة تشغيل نظام aBooD...")
         os.execl(sys.executable, sys.executable, *sys.argv)
 
-    # أمر استخراج اللوج (حل مشكلة Invalid file parts)
+    # أمر استخراج اللوج
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوج$"))
     async def logs_handler(event):
         if not os.path.exists(LOG_FILENAME):
@@ -104,7 +133,6 @@ def add_handler_to_client(client, is_bot=False):
         await event.edit("⏳ جارٍ تجهيز سجل الأخطاء...")
         temp_log = "temp_log.txt"
         try:
-            # نأخذ نسخة من الملف لتجنب خطأ التعديل أثناء الرفع
             shutil.copyfile(LOG_FILENAME, temp_log)
             await client.send_file(
                 event.chat_id, 
@@ -147,7 +175,6 @@ async def start_instance(session_str, bot_token, identifier):
             add_handler_to_client(client, is_bot=False)
             await load_plugins(client, PLUGINS_PATH, f"حساب_{identifier}")
             
-            # الانضمام التلقائي للقناة
             try: await client(JoinChannelRequest(CHANNEL_USERNAME))
             except: pass
             
@@ -173,7 +200,7 @@ async def start_instance(session_str, bot_token, identifier):
 # --- الإقلاع الرئيسي للنظام ---
 async def main():
     logger.info("--- [ PHOENIX HOSTING SYSTEM - v3.0 ] ---")
-    logger.info("🛡️ نظام التنصيب المتعدد والمسح التلقائي مفعل.")
+    logger.info("🛡️ نظام التنصيب المتعدد، قبول الطلبات، وتحويل الملفات مفعل.")
     
     files = [f for f in os.listdir(CLIENTS_DIR) if f.endswith(".txt")]
     
@@ -213,4 +240,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("\n👋 تم إيقاف المحرك.")
-
