@@ -3,20 +3,21 @@
 from telethon import events, Button
 
 try:
-    from .. import l313l
-except:
-    try:
-        from zedthon import l313l
-    except:
-        import l313l
-
-client = l313l
+    import l313l
+    client = l313l.l313l
+except Exception:
+    from .. import l313l as client
 
 @client.on(events.NewMessage(pattern="/start", incoming=True))
 async def bot_start(event):
     if event.is_private:
-        # جلب اسم المطور عبود
-        name = (await event.get_sender()).first_name
+        # جلب الاسم بشكل آمن
+        try:
+            sender = await event.get_sender()
+            name = sender.first_name if sender else "عبود"
+        except:
+            name = "عبود"
+            
         msg = f"**مرحباً بك عزيـزي {name} ✨**\n\n"
         msg += "أنا البوت المساعد الخاص بـ **سورس عبود**\n"
         msg += "البوت يعمل الآن بنجاح ✅"
