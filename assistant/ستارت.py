@@ -6,6 +6,7 @@ import re
 import random
 import json
 import requests
+import logging  # <-- تم إضافة هذا السطر لحل الخطأ
 from collections import defaultdict
 from datetime import datetime
 from typing import Optional, Union
@@ -16,12 +17,11 @@ from telethon.events import CallbackQuery, StopPropagation
 from telethon.utils import get_display_name
 
 # === تعديل الاستيرادات لتتوافق مع السورس الجديد ===
-# بدلاً من استيراد Config و l313l من السورس القديم، نستورد الدوال من السورس الجديد
+# بدلاً من استيراد Config و l313l من السورس القديم، نستورد الدوال من السورس الرئيسي
 import sys
 import os
 
 # نحصل على الدوال من السورس الرئيسي (الذي تم استيراده في __main__)
-# ولكن بما أننا في مجلد assistant منفصل، نستخدم sys.modules للوصول إلى دوال القاعدة
 main_module = sys.modules.get('__main__')
 if main_module:
     get_config = main_module.get_config
@@ -63,7 +63,8 @@ class BotBlacklist(Base):
     user_id = Column(BigInteger, primary_key=True)
 
 # إنشاء الجداول إذا لم تكن موجودة
-Base.metadata.create_all(main_module.engine if main_module else None)
+if main_module and hasattr(main_module, 'engine'):
+    Base.metadata.create_all(main_module.engine)
 
 # === دوال مساعدة بديلة عن تلك الموجودة في السورس القديم ===
 def gvarstatus(key):
@@ -89,14 +90,12 @@ def check_is_black_list(user_id):
     return session.query(BotBlacklist).filter(BotBlacklist.user_id == user_id).first() is not None
 
 def get_user_logging(message_id):
-    # غير مستخدمة بكثرة، سنعيدها فارغة
     return None
 
 def get_user_reply(message_id):
     return None
 
 def ban_user_from_bot(user_id):
-    # يمكن تنفيذها لاحقاً
     pass
 
 def add_user_to_db(msg_id, first_name, chat_id, logger_id, result_id, reply_id=0):
@@ -125,13 +124,8 @@ def _format(text, args):
     return text.format(**args) if args else text
 
 # === إعدادات البوت ===
-# نستخرج معلومات البوت من الجلسة
 bot_token = get_config("TOKEN")
-if bot_token:
-    # يمكن جلب اسم المستخدم لاحقاً
-    botusername = ""  # سيتم تعبئته عند التشغيل
-else:
-    botusername = ""
+botusername = ""  # سيتم تعبئته عند التشغيل
 
 # === متغيرات عامة ===
 LOGS = logging.getLogger(__name__)
@@ -399,8 +393,6 @@ def setup(client):
                 # جميع قوائم الزخرفة كما هي بدون حذف أي حرف
                 iitems = ['࿐', '𖣳', '𓃠', '𖡟', '𖠜', '‌♡⁩', '‌༗', '‌𖢖', '❥', '‌ঌ', '𝆹𝅥𝅮', '𖠜', '𖠲', '𖤍', '𖠛', ' 𝅘𝅥𝅮', '‌༒', '‌ㇱ', '߷', 'メ', '〠', '𓃬', '𖠄']
                 smiile1 = random.choice(iitems)
-                # ... (جميع smiile2 إلى smiile40 كما هي في الكود الأصلي)
-                # سأضعها كاملة كما في الملف المرفق
                 smiile2 = random.choice(iitems)
                 smiile3 = random.choice(iitems)
                 smiile4 = random.choice(iitems)
