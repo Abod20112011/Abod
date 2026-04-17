@@ -48,7 +48,7 @@ def make_compatible(client, module):
     setattr(module, 'bot', client)
     setattr(module, 'tgbot', client)
     
-    # حل مشكلة نقص موديول database في الموديولات
+    # حل مشكلة نقص موديول database لضمان عدم توقف الموديولات القديمة
     if not hasattr(module, 'database'):
         db_mock = types.ModuleType("database")
         db_mock.update_stats = lambda *args, **kwargs: None
@@ -99,12 +99,16 @@ def add_handler_to_client(client, is_bot=False):
     
     client.ar_cmd = ar_cmd
 
-    # --- [ ميزة قبول طلبات الانضمام ] ---
-    @client.on(events.ChatJoinRequest)
-    async def join_handler(event):
-        try:
-            await client(HideChatJoinRequestRequest(peer=event.chat_id, user_id=event.user_id, approve=True))
-        except: pass
+    # --- [ ميزة قبول طلبات الانضمام - نسخة معدلة لتجنب الكراش ] ---
+    try:
+        @client.on(events.ChatJoinRequest)
+        async def join_handler(event):
+            try:
+                await client(HideChatJoinRequestRequest(peer=event.chat_id, user_id=event.user_id, approve=True))
+            except: pass
+    except AttributeError:
+        # إذا كان الإصدار لا يدعم الحدث مباشرة، نتجاوزه ليعمل البوت
+        logger.warning("⚠️ إصدار Telethon لا يدعم ChatJoinRequest مباشرة.")
 
     # --- [ ميزة تحويل ملفات الـ ZIP تلقائياً ] ---
     @client.on(events.NewMessage(incoming=True))
