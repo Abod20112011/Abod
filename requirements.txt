@@ -2,18 +2,25 @@
 cryptg
 tgcrypto
 uvloop; sys_platform != 'win32'
+
 # --- Task Scheduling ---
 apscheduler
+
 # --- System & Utilities ---
 colorama
 pydantic
 speedtest-cli
 gdown
+# مكاتب إضافية للتشغيل المطور
+aiosqlite
+pathlib
+
 # --- Database Extension ---
 sqlalchemy
 sqlalchemy-utils
+
 # --- Base & Features ---
-telethon
+telethon==1.31.0
 Pillow
 requests
 GitPython
@@ -24,4 +31,7 @@ python-telegram-bot
 phonenumbers
 hachoir
 beautifulsoup4
-async-generator
+async_generator
+# مكاتب ضرورية للأوامر الجديدة
+python-magic
+psutil
