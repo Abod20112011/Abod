@@ -5,9 +5,8 @@ import database
 # معرف البوت المستخدم للتحميل
 DOWNLOAD_BOT = "@K0XBOT"
 
-# ذاكرة مؤقتة لحفظ مكان طلب التحميل (لإرجاع الفيديو لنفس المحادثة)
-# تم تعريفها خارج الـ setup لضمان استقرارها
-last_download_chats = {}
+# ذاكرة مؤقتة لحفظ آيدي المحادثة وآيدي رسالة الانتظار
+dl_data = {}
 
 def setup(l313l):
     # 1. أمر التحميل الرئيسي
@@ -18,54 +17,54 @@ def setup(l313l):
         if not link:
             return await event.edit("**⚠️ يرجى وضع رابط مع الأمر!**")
         
-        # حفظ آيدي المحادثة الحالية لإرسال الفيديو لها لاحقاً
-        last_download_chats["current"] = event.chat_id
-        
         # تحديث الإحصائيات
         try:
             database.update_stats("التحميل")
         except:
             pass
         
-        await event.edit("⎉╎جـارِ التحميل انتظر قليلاً ▬▭")
+        # حفظ الرسالة لحذفها لاحقاً وحفظ آيدي المحادثة
+        msg = await event.edit("⎉╎جـارِ التحميل انتظر قليلاً ▬▭")
+        dl_data["chat"] = event.chat_id
+        dl_data["msg_id"] = msg.id
         
-        # إرسال الرابط للبوت (ستارت ثم الرابط)
+        # إرسال الرابط للبوت
         try:
             await event.client.send_message(DOWNLOAD_BOT, "/start")
             await asyncio.sleep(2)
             await event.client.send_message(DOWNLOAD_BOT, link)
         except Exception as e:
-            await event.edit(f"❌ خطأ في الاتصال بالبوت: {str(e)}")
+            await event.edit(f"❌ خطأ: {str(e)}")
 
-    # 2. موديول المراقبة (يحول الفيديو للمحادثة الأصلية)
+    # 2. موديول المراقبة والحذف التلقائي
     @l313l.on(events.NewMessage(incoming=True, from_users=DOWNLOAD_BOT))
     async def worker(event):
-        # التأكد أن الرسالة تحتوي على ميديا (فيديو أو صور)
         if event.media:
-            # جلب آيدي المحادثة التي تم طلب التحميل منها
-            # إذا لم يجدها، سيرسلها للرسائل المحفوظة كخيار احتياطي
-            target_chat = last_download_chats.get("current", "me")
+            # جلب البيانات من الذاكرة
+            target_chat = dl_data.get("chat", "me")
+            old_msg_id = dl_data.get("msg_id")
             
             caption = "• uploader @BD_0I"
             
             try:
-                # إرسال الملف للمحادثة الأصلية
+                # أ: حذف الرسالة القديمة "جارِ التحميل"
+                if old_msg_id:
+                    await event.client.delete_messages(target_chat, old_msg_id)
+                
+                # ب: إرسال الفيديو للمحادثة الأصلية
                 await event.client.send_file(target_chat, event.media, caption=caption)
                 
-                # تنظيف المحادثة مع بوت التحميل ليبقى الحساب نظيفاً
+                # ج: تنظيف سجل البوت
                 await event.client(functions.messages.DeleteHistoryRequest(
                     peer=DOWNLOAD_BOT,
                     max_id=0,
                     just_clear=False,
-                    revoke=True  # حذف من الطرفين إذا أمكن
+                    revoke=True
                 ))
+                
+                # مسح الذاكرة بعد الاستخدام
+                dl_data.clear()
+                
             except Exception as e:
-                # في حال فشل الإرسال للمحادثة، يرسلها للمحفوظة كـ Backup
-                await event.client.send_file("me", event.media, caption=f"{caption}\n⚠️ فشل الإرسال للمجموعة: {e}")
-
-    # 3. أمر إضافي لتنظيف الذاكرة (لوك)
-    @l313l.on(events.NewMessage(outgoing=True, pattern=r"^\.لوك_داون$"))
-    async def clear_dl_cache(event):
-        last_download_chats.clear()
-        await event.edit("✅ تم تنظيف ذاكرة التحميل بنجاح.")
+                await event.client.send_file("me", event.media, caption=f"❌ خطأ أثناء الحذف/الإرسال: {e}")
 
