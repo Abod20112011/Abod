@@ -1,16 +1,15 @@
-here# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # Plugins/المطور.py
 # أمر .المطور يرسل رسالة المطور مع أزرار ملونة
 
 from telethon import events
 
-# ضع يوزر البوت المساعد هنا
+# ضع يوزر البوت المساعد هنا (بدون @)
 BOT_USERNAME = "xxscnbot"
 
 def setup(client):
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.المطور$"))
     async def developer_cmd(event):
-        # استعلام Inline من البوت المساعد
         try:
             results = await client.inline_query(BOT_USERNAME, "المطور")
             if results:
