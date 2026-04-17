@@ -1,4 +1,4 @@
-import os, sys, asyncio, importlib.util, subprocess, types, logging
+import os, sys, asyncio, importlib.util, subprocess, types, logging, shutil
 from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import JoinChannelRequest
@@ -80,7 +80,7 @@ async def load_plugins(client, folder_path, label):
                     logger.error(f"❌ خطأ في تحميل {file} من {label}: {e}")
     logger.info(f"✅ {label}: تم تشغيل {count} موديول بنجاح.")
 
-# --- [ ميزة التنصيب وإعادة التشغيل ] ---
+# --- [ ميزة التنصيب وإعادة التشغيل وحل مشكلة اللوج ] ---
 def add_handler_to_client(client, is_bot=False):
     def ar_cmd(pattern=None, **kwargs):
         if pattern and not pattern.startswith(("^", "\\", "/")):
@@ -94,6 +94,29 @@ def add_handler_to_client(client, is_bot=False):
     async def restart_handler(event):
         await event.edit("🔄 جارٍ إعادة تشغيل نظام aBooD...")
         os.execl(sys.executable, sys.executable, *sys.argv)
+
+    # أمر استخراج اللوج (حل مشكلة Invalid file parts)
+    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوج$"))
+    async def logs_handler(event):
+        if not os.path.exists(LOG_FILENAME):
+            return await event.edit("⚠️ لا يوجد سجل أخطاء حالياً.")
+        
+        await event.edit("⏳ جارٍ تجهيز سجل الأخطاء...")
+        temp_log = "temp_log.txt"
+        try:
+            # نأخذ نسخة من الملف لتجنب خطأ التعديل أثناء الرفع
+            shutil.copyfile(LOG_FILENAME, temp_log)
+            await client.send_file(
+                event.chat_id, 
+                temp_log, 
+                caption=f"✨ سجل الأخطاء لسورس عبود\n✅ تم التنظيف بنجاح.",
+                reply_to=event.id
+            )
+            await event.delete()
+        except Exception as e:
+            await event.edit(f"❌ فشل إرسال السجل: {e}")
+        finally:
+            if os.path.exists(temp_log): os.remove(temp_log)
 
     # أمر التنصيب للحسابات الأخرى
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تنصيب(?:\s+(.*))?"))
@@ -190,3 +213,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("\n👋 تم إيقاف المحرك.")
+
