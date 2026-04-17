@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# سورس عبود المطور - النسخة الشاملة v9.0
-# مبرمج لدعم ميزات التنصيب التلقائي، تحديث المكاتب، وأتمتة BotFather
+# سورس عبود المطور - الإصدار العاشر المحسن
+# مبرمج ليكون مستقراً بالكامل مع قاعدة بيانات SQLAlchemy
 
 import os
 import sys
@@ -11,20 +11,23 @@ import types
 import logging
 import shutil
 import time
-import re
 from datetime import datetime
 
-# --- [ 1. إعدادات قاعدة البيانات (SQLAlchemy) - كما طلبت بدون حذف ] ---
+# --- [ 1. إعداد قاعدة البيانات المدمجة (SQLAlchemy) ] ---
+# قمت بوضع الكود الخاص بك هنا بالكامل مع الترتيب المطلوب
+
 from sqlalchemy import create_engine, Column, String, BigInteger, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # إعداد قاعدة البيانات (تستخدم SQLite افتراضياً)
-DB_URL = os.getenv("DATABASE_URL", "sqlite:///abood_data.db")
+DB_URL = os.getenv("DATABASE_URL", "sqlite:///phoenix.db")
 engine = create_engine(DB_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
 Base = declarative_base()
+
+# --- تعريف الجداول ---
 
 class Config(Base):
     __tablename__ = "config"
@@ -42,10 +45,10 @@ class Stats(Base):
     plugin_name = Column(String(255), primary_key=True)
     count = Column(Integer, default=0)
 
-# إنشاء الجداول فوراً لضمان عدم حدوث خطأ (no such table)
+# إنشاء الجداول فور تشغيل الملف لضمان عدم وجود أخطاء
 Base.metadata.create_all(engine)
 
-# --- دوال قاعدة البيانات المدمجة ---
+# --- دوال الإعدادات (Config) ---
 
 def get_config(variable_name):
     """جلب إعداد معين من قاعدة البيانات"""
@@ -68,6 +71,8 @@ def del_config(variable_name):
     if res:
         session.delete(res)
         session.commit()
+
+# --- دوال الكتم (Mute System) ---
 
 def is_muted(user_id):
     """التحقق إذا كان المستخدم مكتوماً"""
@@ -98,6 +103,8 @@ def clear_all_muted():
     session.query(MutedUsers).delete()
     session.commit()
 
+# --- أسطر إضافية لدعم موديول التخزين المحسن ---
+
 def is_storage_on():
     """التحقق من حالة تشغيل نظام التخزين"""
     return get_config("STORAGE_MASTER") == "on"
@@ -106,6 +113,8 @@ def get_storage_chat():
     """جلب آيدي مجموعة التخزين"""
     chat_id = get_config("STORAGE_CHAT_ID")
     return int(chat_id) if chat_id else None
+
+# --- الوظيفة المطلوبة لحل خطأ الكونسول (Update Stats) ---
 
 def update_stats(plugin_name):
     """تحديث إحصائيات استخدام الموديولات"""
@@ -122,258 +131,227 @@ def get_stats(plugin_name):
     res = session.query(Stats).filter(Stats.plugin_name == plugin_name).first()
     return res.count if res else 0
 
-# --- [ 2. نظام التحديث التلقائي واللوجر ] ---
+# --- [ 2. نظام تحديث المكاتب واللوجر ] ---
 
-LOG_FILE = "abood_logs.txt"
+LOG_FILE = "abood_source_log.txt"
 
-def update_libraries():
-    """تحديث المكاتب لضمان عمل السورس بدون نقص"""
+def update_reqs():
+    """تحديث مكاتب السورس آلياً"""
     print("🛠️ جاري فحص وتحديث مكاتب عبود المطور...")
     libs = ["telethon==1.31.0", "sqlalchemy", "requests", "pydantic", "aiohttp", "pytz", "bs4"]
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade"] + libs)
         print("✅ تم تحديث المكاتب بنجاح.")
     except Exception as e:
-        print(f"❌ خطأ أثناء تحديث المكاتب: {e}")
+        print(f"⚠️ فشل التحديث التلقائي: {e}")
 
-def setup_logger():
-    """إعداد سجل الأخطاء"""
+def init_logger():
     if os.path.exists(LOG_FILE):
         try: os.remove(LOG_FILE)
         except: pass
-    
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(LOG_FILE, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
+        handlers=[logging.FileHandler(LOG_FILE, encoding='utf-8'), logging.StreamHandler()]
     )
     return logging.getLogger("ABOOD_SYSTEM")
 
-logger = setup_logger()
+logger = init_logger()
 
-# --- [ 3. محرك التيليثون والإعدادات الأساسية ] ---
+# --- [ 3. إعدادات التيليثون والمحرك الأساسي ] ---
 
 from telethon import TelegramClient, events, functions, types as tl_types
 from telethon.sessions import StringSession
 
 API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
-OWNER_ID = 6373993992 # أيدي عبود
+OWNER_ID = 6373993992 
 
-# المجلدات المطلوبة
 PLUGINS_DIR = "Plugins"
 ASSISTANT_DIR = os.path.join(PLUGINS_DIR, "assistant")
 
-for folder in [PLUGINS_DIR, ASSISTANT_DIR]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+# إنشاء المجلدات إذا لم تكن موجودة
+for d in [PLUGINS_DIR, ASSISTANT_DIR]:
+    if not os.path.exists(d): os.makedirs(d)
 
-running_clients = []
+clients = []
 
-def compatibility_layer(client, module):
-    """حقن المتغيرات لضمان عمل الأكواد القديمة"""
+def inject_deps(client, module):
+    """حقن التبعيات لضمان عمل الموديولات القديمة"""
     aliases = ['l313l', 'zedub', 'joker', 'bot', 'tgbot', 'ph_bot', 'zedthon']
     for alias in aliases:
         setattr(module, alias, client)
-    
-    # حقن قاعدة البيانات
+    # ربط قاعدة البيانات بالموديولات
     setattr(module, 'database', sys.modules[__name__])
 
-async def load_plugins(client, directory, category):
-    """محرك تحميل المجلدات التلقائي"""
+async def load_all_plugins(client, folder, label):
+    """محرك تحميل الإضافات التلقائي"""
     count = 0
-    if not os.path.exists(directory): return
-    
-    if directory not in sys.path:
-        sys.path.append(directory)
+    if not os.path.exists(folder): return
+    if folder not in sys.path: sys.path.append(folder)
 
-    for root, _, files in os.walk(directory):
-        # منع تحميل مجلد المساعد داخل موديولات الحساب والعكس
-        if "assistant" in root and category != "ASSISTANT":
-            continue
-            
+    for root, _, files in os.walk(folder):
+        # فصل موديولات البوت عن الحساب
+        if "assistant" in root and label != "ASSISTANT": continue
+        
         for file in files:
             if file.endswith(".py") and not file.startswith("__"):
                 path = os.path.join(root, file)
-                mod_name = f"mod_{category}_{file[:-3]}_{int(time.time())}"
+                name = f"mod_{label}_{file[:-3]}_{int(time.time())}"
                 try:
-                    spec = importlib.util.spec_from_file_location(mod_name, path)
+                    spec = importlib.util.spec_from_file_location(name, path)
                     module = importlib.util.module_from_spec(spec)
-                    compatibility_layer(client, module)
+                    inject_deps(client, module)
                     spec.loader.exec_module(module)
-                    if hasattr(module, 'setup'):
-                        module.setup(client)
+                    if hasattr(module, 'setup'): module.setup(client)
                     count += 1
                 except Exception as e:
-                    logger.error(f"❌ خطأ في تحميل {file}: {e}")
-    
-    logger.info(f"✨ {category}: تم تشغيل {count} موديول بنجاح.")
+                    logger.error(f"❌ فشل تحميل {file}: {e}")
+    logger.info(f"✨ {label}: تم تشغيل {count} موديول.")
 
-# --- [ 4. أتمتة BotFather (اسم عبود واختصارات البوت) ] ---
+# --- [ 4. أتمتة BotFather (الأونلاين والاختصارات) ] ---
 
-async def set_bot_online_features(client, bot_token):
-    """تفعيل وضع الأونلاين وتغيير الاسم والأوامر"""
+async def bot_father_automation(client, bot_token):
+    """ضبط وضع الأونلاين والأوامر مع انتظار 2 ثانية"""
     try:
-        # عميل مؤقت لجلب يوزر البوت
+        # جلب يوزر البوت
         temp = TelegramClient(StringSession(), API_ID, API_HASH)
         await temp.start(bot_token=bot_token)
         me = await temp.get_me()
         bot_user = f"@{me.username}"
         await temp.disconnect()
 
-        target_name = "عبود 🩵"
-        target_commands = "start - للبدء\nhack - قسم أمر الهـاك"
-
-        logger.info(f"⚙️ جاري تحديث بيانات {bot_user} في BotFather...")
+        logger.info(f"⚙️ جاري ضبط ميزات {bot_user} في BotFather...")
         
         async with client.conversation("@BotFather") as conv:
-            # تحديث الاسم
-            await conv.send_message("/setname")
-            await asyncio.sleep(1)
-            await conv.send_message(bot_user)
-            await asyncio.sleep(1)
-            await conv.send_message(target_name)
-            
-            # تحديث الإنلاين (الأونلاين)
+            # 1. تفعيل وضع الأونلاين (Inline Mode) باسم عبود
             await conv.send_message("/setinline")
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
             await conv.send_message(bot_user)
-            await asyncio.sleep(1)
-            await conv.send_message("عبود أونلاين 💎")
+            await asyncio.sleep(2)
+            await conv.send_message("عبود 🩵") # اسم زر الأونلاين
+            await asyncio.sleep(2)
             
-            # تحديث الأوامر
+            # 2. ضبط قائمة الأوامر
             await conv.send_message("/setcommands")
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
             await conv.send_message(bot_user)
-            await asyncio.sleep(1)
-            await conv.send_message(target_commands)
+            await asyncio.sleep(2)
+            # الاختصارات المطلوبة
+            commands = "start - للبدء\nhack - قسم أمر الهـاك"
+            await conv.send_message(commands)
+            await asyncio.sleep(2)
             
-        logger.info(f"✅ تم ضبط {bot_user} بنجاح.")
+        logger.info(f"✅ تم تفعيل ميزات الأونلاين لـ {bot_user}")
     except Exception as e:
-        logger.error(f"⚠️ فشل تحديث BotFather: {e}")
+        logger.error(f"⚠️ فشل ضبط BotFather: {e}")
 
-# --- [ 5. أوامر التحكم الرئيسية ] ---
+# --- [ 5. الأوامر الأساسية ] ---
 
-def register_core_commands(client, is_bot=False):
-    """تسجيل أوامر السورس الأساسية"""
-    
-    def abood_cmd(pattern=None, **kwargs):
+def setup_core_cmds(client, is_bot=False):
+    def ar_cmd(pattern=None, **kwargs):
         if pattern and not pattern.startswith(("^", "\\", "/")):
             pattern = f"^\\.{pattern}"
         return client.on(events.NewMessage(outgoing=not is_bot, pattern=pattern, **kwargs))
     
-    client.ar_cmd = abood_cmd
+    client.ar_cmd = ar_cmd
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تنصيب (.*)$"))
-    async def install_handler(event):
-        """أمر التنصيب بالرد على الجلسة"""
+    async def install_api(event):
         if event.sender_id != OWNER_ID: return
         token = event.pattern_match.group(1).strip()
         reply = await event.get_reply_message()
         if not reply or not reply.text:
-            return await event.edit("⚠️ **يجب الرد على (كود الجلسة) وكتابة:** `.تنصيب <توكن_البوت>`")
+            return await event.edit("⚠️ **رد على الجلسة واكتب:** `.تنصيب <توكن>`")
         
-        session_str = reply.text.strip()
-        set_config("MAIN_SESSION", session_str)
-        set_config("BOT_TOKEN", token)
+        set_config("SESSION", reply.text.strip())
+        set_config("TOKEN", token)
         await event.edit("✅ **تم حفظ البيانات! السورس سيعمل الآن.**")
         os.execl(sys.executable, sys.executable, *sys.argv)
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.اعادة تشغيل$"))
-    async def reboot_handler(event):
+    async def reboot_api(event):
         if event.sender_id != OWNER_ID: return
-        await event.edit("♻️ **جاري إعادة تشغيل سورس عبود...**")
+        await event.edit("♻️ **جاري إعادة التشغيل...**")
         os.execl(sys.executable, sys.executable, *sys.argv)
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تحديث المكاتب$"))
-    async def update_handler(event):
+    async def update_api(event):
         if event.sender_id != OWNER_ID: return
-        await event.edit("🔄 **جاري التحديث... قد يستغرق الأمر دقيقة.**")
-        update_libraries()
-        await event.edit("✅ **تم تحديث كافة المكاتب بنجاح!**")
+        await event.edit("🔄 **جاري التحديث...**")
+        update_reqs()
+        await event.edit("✅ **تم تحديث المكاتب بنجاح!**")
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوك$"))
-    async def log_handler(event):
-        """إرسال ملف السجل"""
+    async def send_log_api(event):
         if event.sender_id != OWNER_ID: return
         if not os.path.exists(LOG_FILE):
-            return await event.edit("⚠️ **لا يوجد سجل حالياً.**")
+            return await event.edit("⚠️ **لا يوجد سجل.**")
         
-        await event.edit("⏳ **جاري سحب السجل...**")
+        await event.edit("⏳ **جاري جلب السجل...**")
         me = await client.get_me()
-        user_mention = f"@{me.username}" if me.username else me.first_name
+        user = f"@{me.username}" if me.username else me.first_name
         
-        caption = (
-            f"📊 **سجل عمليات سورس عبود**\n"
-            f"👤 **المطور:** {user_mention}\n"
-            f"📅 **الوقت:** `{datetime.now().strftime('%Y-%m-%d %H:%M')}`"
+        cap = (
+            f"📊 **سجل سورس عبود**\n"
+            f"👤 **المطور:** {user}\n"
+            f"📅 **الوقت:** `{datetime.now().strftime('%H:%M:%S')}`"
         )
-        
-        await client.send_file(event.chat_id, LOG_FILE, caption=caption, reply_to=event.id)
+        await client.send_file(event.chat_id, LOG_FILE, caption=cap, reply_to=event.id)
         await event.delete()
 
-# --- [ 6. مشغل الخدمات والدالة الرئيسية ] ---
+# --- [ 6. المشغل والدالة الرئيسية ] ---
 
-async def start_abood_instance(session_str, token, label):
-    """بدء تشغيل الحساب والبوت المساعد"""
+async def run_abood_instance(s_str, t_str):
     try:
-        # تشغيل حساب المستخدم الرئيسي
-        main_client = TelegramClient(StringSession(session_str), API_ID, API_HASH)
-        await main_client.start()
-        register_core_commands(main_client)
-        await load_plugins(main_client, PLUGINS_DIR, "MAIN")
-        running_clients.append(main_client)
+        # تشغيل الحساب
+        main_cl = TelegramClient(StringSession(s_str), API_ID, API_HASH)
+        await main_cl.start()
+        setup_core_cmds(main_cl)
+        await load_all_plugins(main_cl, PLUGINS_DIR, "MAIN")
+        clients.append(main_cl)
 
-        # تشغيل البوت المساعد
-        bot_client = TelegramClient(f"bot_session_{label}", API_ID, API_HASH)
-        await bot_client.start(bot_token=token)
-        register_core_commands(bot_client, is_bot=True)
-        await load_plugins(bot_client, ASSISTANT_DIR, "ASSISTANT")
-        running_clients.append(bot_client)
+        # تشغيل المساعد
+        bot_cl = TelegramClient("assistant_session", API_ID, API_HASH)
+        await bot_cl.start(bot_token=t_str)
+        setup_core_cmds(bot_cl, is_bot=True)
+        await load_all_plugins(bot_cl, ASSISTANT_DIR, "ASSISTANT")
+        clients.append(bot_cl)
 
-        # تفعيل ميزات BotFather تلقائياً
-        asyncio.create_task(set_bot_online_features(main_client, token))
+        # تفعيل الأتمتة
+        asyncio.create_task(bot_father_automation(main_cl, t_str))
         
-        logger.info(f"💎 تم تشغيل كافة الخدمات لـ {label}")
+        logger.info("💎 النظام يعمل الآن بكافة طاقته.")
     except Exception as e:
-        logger.error(f"❌ كراش في مشغل {label}: {e}")
+        logger.error(f"❌ خطأ فادح في التشغيل: {e}")
 
 async def main():
-    """نقطة انطلاق السورس"""
-    logger.info("--- [ ABOOD SYSTEM STARTING ] ---")
+    logger.info("--- [ ABOOD START ] ---")
     
-    # محاولة جلب البيانات من قاعدة البيانات
-    saved_session = get_config("MAIN_SESSION")
-    saved_token = get_config("BOT_TOKEN")
+    s = get_config("SESSION")
+    t = get_config("TOKEN")
 
-    if not saved_session or not saved_token:
-        print("👋 مرحباً عبود، يبدو أنك تشغل السورس لأول مرة.")
-        print("يرجى إدخال البيانات المطلوبة:")
-        new_session = input("👤 أدخل كود الجلسة (String Session): ").strip()
-        new_token = input("🤖 أدخل توكن البوت (Bot Token): ").strip()
-        
-        if new_session and new_token:
-            set_config("MAIN_SESSION", new_session)
-            set_config("BOT_TOKEN", new_token)
-            saved_session, saved_token = new_session, new_token
+    if not s or not t:
+        print("👤 مرحباً عبود، السورس يحتاج للبيانات لأول مرة:")
+        s_in = input("أدخل الجلسة (String Session): ").strip()
+        t_in = input("أدخل توكن البوت (Bot Token): ").strip()
+        if s_in and t_in:
+            set_config("SESSION", s_in)
+            set_config("TOKEN", t_in)
+            s, t = s_in, t_in
         else:
-            print("❌ يجب إدخال البيانات للتشغيل!")
+            print("❌ البيانات مطلوبة!")
             return
 
-    # التحديث التلقائي عند الإقلاع
-    update_libraries()
+    # التحديث عند الإقلاع
+    update_reqs()
     
-    # بدء التشغيل
-    await start_abood_instance(saved_session, saved_token, "ABOOD_OWNER")
-
-    if running_clients:
-        await asyncio.gather(*[cl.run_until_disconnected() for cl in running_clients])
+    await run_abood_instance(s, t)
+    
+    if clients:
+        await asyncio.gather(*[c.run_until_disconnected() for c in clients])
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    except (KeyboardInterrupt, SystemExit): pass
