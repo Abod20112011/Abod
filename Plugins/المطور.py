@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # Plugins/developer.py
-# أمر .المطور مع زر أزرق يوجه لحساب المطور
+# أمر .المطور مع زر يوجه لحساب المطور
 
 import random
-from telethon import events, types
+from telethon import events, Button
 
 OWNER_USERNAME = "BD_0I"        # بدون @
 OWNER_ID = 6373993992           # آيديك
@@ -31,13 +31,10 @@ def setup(client):
             "**• النظام :** يعمل الآن بنجاح 🚀"
         )
 
-        dev_button = types.KeyboardButtonUrl(
+        # زر رابط باستخدام Button.url (متوافق مع Telethon 1.31.0)
+        dev_button = Button.url(
             text=f"👨‍💻 المطور: {owner_name}",
-            url=f"https://t.me/{OWNER_USERNAME}",
-            color=1   # أزرق (primary)
-        )
-        inline_markup = types.ReplyInlineMarkup(
-            rows=[types.KeyboardButtonRow(buttons=[dev_button])]
+            url=f"https://t.me/{OWNER_USERNAME}"
         )
 
         try:
@@ -45,14 +42,14 @@ def setup(client):
                 event.chat_id,
                 file=pic,
                 caption=caption,
-                buttons=inline_markup,
+                buttons=dev_button,
                 reply_to=reply_to
             )
         except Exception:
             await client.send_message(
                 event.chat_id,
                 caption,
-                buttons=inline_markup,
+                buttons=dev_button,
                 reply_to=reply_to
             )
 
