@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, Column, String, BigInteger
+from sqlalchemy import create_engine, Column, String, BigInteger, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -22,6 +22,12 @@ class MutedUsers(Base):
     user_id = Column(BigInteger, primary_key=True)
     full_name = Column(String(255), nullable=True)
     username = Column(String(255), nullable=True)
+
+# جدول الإحصائيات الجديد لمنع أخطاء الـ Plugins
+class Stats(Base):
+    __tablename__ = "stats"
+    plugin_name = Column(String(255), primary_key=True)
+    count = Column(Integer, default=0)
 
 # إنشاء الجداول فور تشغيل الملف
 Base.metadata.create_all(engine)
@@ -91,3 +97,20 @@ def get_storage_chat():
     """جلب آيدي مجموعة التخزين"""
     chat_id = get_config("STORAGE_CHAT_ID")
     return int(chat_id) if chat_id else None
+
+# --- الوظيفة المطلوبة لحل خطأ الكونسول (Update Stats) ---
+
+def update_stats(plugin_name):
+    """تحديث إحصائيات استخدام الموديولات (حل مشكلة AttributeError)"""
+    res = session.query(Stats).filter(Stats.plugin_name == plugin_name).first()
+    if res:
+        res.count += 1
+    else:
+        res = Stats(plugin_name=plugin_name, count=1)
+        session.add(res)
+    session.commit()
+
+def get_stats(plugin_name):
+    """جلب عدد مرات استخدام موديول معين"""
+    res = session.query(Stats).filter(Stats.plugin_name == plugin_name).first()
+    return res.count if res else 0
