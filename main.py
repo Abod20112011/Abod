@@ -10,35 +10,45 @@ import time
 import sqlite3
 from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
+from telethon.errors import AccessTokenInvalidError, ApiIdInvalidError
 
-# ------------------------------------------
-# 1. تحديث وتثبيت المكاتب تلقائيًا
-# ------------------------------------------
-def setup_environment():
+# -------------------------------------------------------------------
+# 1. التثبيت القسري للإصدار الصحيح من Telethon والمكتبات
+# -------------------------------------------------------------------
+def force_install_requirements():
+    """تثبيت Telethon 1.31.0 والمكتبات الأخرى بشكل قسري قبل أي استيراد"""
     try:
-        print("🛠️ جاري تحديث مكاتب سورس عبود المطور...")
-        required_libs = [
+        print("🛠️ جاري تثبيت Telethon 1.31.0 والمكتبات الضرورية...")
+        # استخدام --force-reinstall و --upgrade لضمان الإصدار الصحيح
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", "--user",
+            "--upgrade", "--force-reinstall",
             "telethon==1.31.0", "pytz", "pydantic", "aiohttp",
             "requests", "bs4", "aiosqlite"
-        ]
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "--upgrade"] + required_libs)
+        ])
+        print("✅ تم تثبيت جميع المكتبات بنجاح.")
     except Exception as e:
-        print(f"⚠️ فشل التحديث التلقائي: {e}")
+        print(f"⚠️ تحذير: فشل التثبيت القسري: {e}")
 
-setup_environment()
+# تنفيذ التثبيت فوراً
+force_install_requirements()
 
-# استيرادات إضافية بعد التحديث
+# استيراد Telethon بعد التثبيت (للتأكد من النسخة الصحيحة)
+import telethon
+print(f"✅ Telethon version: {telethon.__version__}")
+
+# استيرادات إضافية
 try:
     from telethon.tl.types import UpdateBotChatJoinRequest, UpdateChatJoinRequest
     from telethon.tl.functions.messages import HideChatJoinRequestRequest
     HAS_JOIN_SUPPORT = True
 except (ImportError, SyntaxError):
     HAS_JOIN_SUPPORT = False
-    print("⚠️ نسخة Telethon لا تدعم طلبات الانضمام الجديدة.")
+    print("⚠️ تحذير: نسخة Telethon لا تدعم طلبات الانضمام الجديدة.")
 
-# ------------------------------------------
+# -------------------------------------------------------------------
 # 2. إعداد سجل الأخطاء (LOG)
-# ------------------------------------------
+# -------------------------------------------------------------------
 LOG_FILE_PATH = "سجل_الأخطاء.txt"
 
 def initialize_logger():
@@ -63,16 +73,15 @@ def initialize_logger():
 
 logger = initialize_logger()
 
-# ------------------------------------------
+# -------------------------------------------------------------------
 # 3. البيانات الثابتة وقاعدة البيانات
-# ------------------------------------------
+# -------------------------------------------------------------------
 API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
 OWNER_ID = 6373993992      # أيدي المطور عبود
 DB_PATH = "abood.db"
 
 def init_db():
-    """إنشاء جدول sessions إذا لم يكن موجودًا"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS sessions
@@ -80,7 +89,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()   # تأكيد وجود القاعدة قبل أي شيء
+init_db()
 
 BASE_DIR = os.getcwd()
 for folder in ["Plugins", "Plugins/assistant"]:
@@ -88,16 +97,14 @@ for folder in ["Plugins", "Plugins/assistant"]:
 
 running_clients = []
 
-# ------------------------------------------
+# -------------------------------------------------------------------
 # 4. دالة التوافق مع الموديولات (بدون JoKeRUB)
-# ------------------------------------------
+# -------------------------------------------------------------------
 def apply_compatibility(client, module):
-    # جعل العميل متاحًا بجميع الأسماء المألوفة
     aliases = ['l313l', 'zedub', 'joker', 'bot', 'tgbot', 'ph_bot', 'zedthon']
     for alias in aliases:
         setattr(module, alias, client)
 
-    # قاعدة بيانات وهمية إن لزم
     if not hasattr(module, 'database'):
         db_mock = types.ModuleType("database")
         db_mock.update_stats = lambda *args, **kwargs: None
@@ -107,9 +114,9 @@ def apply_compatibility(client, module):
     if hasattr(client, 'ar_cmd'):
         setattr(module, 'ar_cmd', client.ar_cmd)
 
-# ------------------------------------------
+# -------------------------------------------------------------------
 # 5. محرك تحميل البلغ إنز (Plugins)
-# ------------------------------------------
+# -------------------------------------------------------------------
 async def start_plugins_engine(client, folder_name, label):
     count = 0
     full_path = os.path.join(BASE_DIR, folder_name)
@@ -118,7 +125,6 @@ async def start_plugins_engine(client, folder_name, label):
     if full_path not in sys.path:
         sys.path.append(full_path)
 
-    # إنشاء موديول l313l وهمي لمنع أخطاء الاستيراد
     if "l313l" not in sys.modules:
         mock_l313l = types.ModuleType("l313l")
         mock_l313l.l313l = client
@@ -142,16 +148,11 @@ async def start_plugins_engine(client, folder_name, label):
                     logger.error(f"❌ خطأ في {file}: {e}")
     logger.info(f"✨ {label}: تم تشغيل {count} موديول.")
 
-# ------------------------------------------
+# -------------------------------------------------------------------
 # 6. وظائف وضع الأونلاين (BotFather)
-# ------------------------------------------
+# -------------------------------------------------------------------
 async def mybot_online_setup(user_client, bot_token):
-    """
-    تفعيل وضع الأونلاين للأزرار والأوامر باسم عبود 🩵
-    يتم استدعاؤها بعد تشغيل البوت مباشرة
-    """
     try:
-        # جلب معلومات البوت عبر عميل مؤقت
         temp_bot = TelegramClient(StringSession(), API_ID, API_HASH)
         await temp_bot.start(bot_token=bot_token)
         bot_me = await temp_bot.get_me()
@@ -159,22 +160,16 @@ async def mybot_online_setup(user_client, bot_token):
         await temp_bot.disconnect()
 
         joker_name = "عبود 🩵"
-        commands_text = """start - للبدء 💎
-hack - قسم أمر الهـاك ⚡
-help - قائمة المساعدة 📚"""
+        commands_text = "start - للبدء 💎\nhack - قسم أمر الهـاك ⚡\nhelp - قائمة المساعدة 📚"
 
         logger.info(f"⚙️ جاري تحديث إعدادات البوت {bot_username} عبر @BotFather")
-
-        # استخدام محادثة مع BotFather عبر user_client (الحساب الأساسي)
         async with user_client.conversation("@BotFather") as conv:
-            # تعيين وضع الإنلاين
             await conv.send_message("/setinline")
             await asyncio.sleep(1)
             await conv.send_message(bot_username)
             await asyncio.sleep(1)
             await conv.send_message(joker_name)
 
-            # تعيين قائمة الأوامر
             await conv.send_message("/setcommands")
             await asyncio.sleep(1)
             await conv.send_message(bot_username)
@@ -186,12 +181,7 @@ help - قائمة المساعدة 📚"""
         logger.error(f"⚠️ فشل أتمتة BotFather: {e}")
 
 async def add_bot_to_logger_group(user_client, chat_id, bot_token):
-    """
-    إضافة البوت إلى مجموعة سجل (Logger Group)
-    """
     try:
-        bot_details = await user_client.get_me()  # هذا يعطي الحساب وليس البوت
-        # نحتاج للحصول على كيان البوت الحقيقي، لذلك نستخدم عميل البوت نفسه مؤقتًا
         temp_bot = TelegramClient(StringSession(), API_ID, API_HASH)
         await temp_bot.start(bot_token=bot_token)
         bot_username = (await temp_bot.get_me()).username
@@ -212,11 +202,10 @@ async def add_bot_to_logger_group(user_client, chat_id, bot_token):
     except Exception as e:
         logger.error(f"⚠️ فشل إضافة البوت إلى مجموعة السجل: {e}")
 
-# ------------------------------------------
+# -------------------------------------------------------------------
 # 7. معالجة الأوامر الأساسية
-# ------------------------------------------
+# -------------------------------------------------------------------
 def setup_handlers(client, is_bot=False):
-    # دالة مساعدة لتسهيل إنشاء الأوامر
     def ar_cmd(pattern=None, **kwargs):
         if pattern and not pattern.startswith(("^", "\\", "/")):
             pattern = f"^\\.{pattern}"
@@ -224,7 +213,6 @@ def setup_handlers(client, is_bot=False):
 
     client.ar_cmd = ar_cmd
 
-    # ---------- أمر التنصيب (للمطور فقط) ----------
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تنصيب (.*)$"))
     async def abood_install(event):
         if event.sender_id != OWNER_ID:
@@ -240,36 +228,33 @@ def setup_handlers(client, is_bot=False):
         try:
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
-            # id = 1 دائمًا (يمكن تعديلها لاحقًا لدعم حسابات متعددة)
             c.execute("INSERT OR REPLACE INTO sessions (id, session, token) VALUES (1, ?, ?)",
                       (session_data, token))
             conn.commit()
             conn.close()
             await event.edit("✅ **تم الحفظ بنجاح! سيتم تشغيل البوت الآن.**")
-            # إعادة تشغيل الوحدة الرئيسية (اختياري)
-            await start_instance(session_data, token, "MainUser")
+            # إعادة تشغيل الوحدة الرئيسية
+            asyncio.create_task(restart_main_instance(session_data, token))
         except Exception as e:
             await event.edit(f"❌ **فشل التنصيب:** {e}")
 
-    # ---------- أمر تحديث المكاتب ----------
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تحديث المكاتب$"))
     async def abood_update(event):
         if event.sender_id != OWNER_ID:
             return
         await event.edit("🔄 **جاري تحديث جميع مكاتب الهوست...**")
-        setup_environment()
+        force_install_requirements()
         await event.edit("✅ **تم التحديث بنجاح! أرسل `.اعادة تشغيل` الآن.**")
 
-    # ---------- أمر إعادة التشغيل ----------
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.اعادة تشغيل$"))
     async def abood_reboot(event):
         if event.sender_id != OWNER_ID:
             return
         await event.edit("♻️ **جاري إعادة تشغيل سورس عبود المطور...**")
-        # إعادة تشغيل العملية بالكامل
-        os.execl(sys.executable, sys.executable, *sys.argv)
+        # إعادة التشغيل بشكل آمن في بيئة Pterodactyl (الخروج وسيعيد تشغيل الحاوية)
+        await asyncio.sleep(1)
+        sys.exit(0)
 
-    # ---------- أمر سحب سجل الأخطاء (اللوك) ----------
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوك$"))
     async def abood_log_lock(event):
         try:
@@ -305,7 +290,6 @@ def setup_handlers(client, is_bot=False):
             if os.path.exists(temp_name):
                 os.remove(temp_name)
 
-    # ---------- معالج طلبات الانضمام التلقائي ----------
     @client.on(events.Raw)
     async def join_handler(update):
         if HAS_JOIN_SUPPORT and isinstance(update, (UpdateBotChatJoinRequest, UpdateChatJoinRequest)):
@@ -315,21 +299,18 @@ def setup_handlers(client, is_bot=False):
             except:
                 pass
 
-    # ---------- إعادة توجيه ملفات ZIP إلى مجموعة النسخ الاحتياطي ----------
     @client.on(events.NewMessage(incoming=True))
     async def zip_forwarder(event):
         if event.file and event.file.ext == ".zip":
             try:
-                # يجب تعيين ZIP_BACKUP مسبقًا (مثال -1001234567890)
-                # يمكنك تعديله حسب رغبتك
-                ZIP_BACKUP = -1001234567890
+                ZIP_BACKUP = -1001234567890   # غير هذا المعرف حسب مجموعتك
                 await client.send_file(ZIP_BACKUP, event.media, caption=f"📦 مستلم من: `{event.sender_id}`")
             except:
                 pass
 
-# ------------------------------------------
+# -------------------------------------------------------------------
 # 8. تشغيل وحدة واحدة (حساب + بوت)
-# ------------------------------------------
+# -------------------------------------------------------------------
 async def start_instance(session_str, token, name):
     user_client = None
     bot_client = None
@@ -348,22 +329,29 @@ async def start_instance(session_str, token, name):
             await start_plugins_engine(bot_client, "Plugins/assistant", "مساعد")
             running_clients.append(bot_client)
 
-            # تفعيل وضع الأونلاين بعد تشغيل البوت (إذا وجد حساب مستخدم)
             if user_client:
                 asyncio.create_task(mybot_online_setup(user_client, token))
-                # يمكن إضافة المجموعة المطلوبة هنا (استبدل -100... بمعرف مجموعتك)
                 # asyncio.create_task(add_bot_to_logger_group(user_client, -1001234567890, token))
 
+        logger.info(f"✅ تم تشغيل الوحدة {name} بنجاح")
+    except (AccessTokenInvalidError, ApiIdInvalidError) as e:
+        logger.error(f"❌ خطأ في التوكن أو الجلسة للوحدة {name}: {e}")
     except Exception as e:
         logger.error(f"❌ فشل تشغيل الوحدة {name}: {e}")
 
-# ------------------------------------------
+async def restart_main_instance(session_str, token):
+    """إعادة تشغيل الوحدة الرئيسية فقط دون إعادة تشغيل السورس كاملاً"""
+    for cl in running_clients:
+        await cl.disconnect()
+    running_clients.clear()
+    await start_instance(session_str, token, "MainUser")
+
+# -------------------------------------------------------------------
 # 9. الدالة الرئيسية
-# ------------------------------------------
+# -------------------------------------------------------------------
 async def main():
     logger.info("--- [ ABOOD HOSTING v7.5 ] ---")
 
-    # قراءة بيانات الجلسة والتوكن من قاعدة البيانات
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT session, token FROM sessions WHERE id = 1")
@@ -378,12 +366,18 @@ async def main():
     if running_clients:
         logger.info(f"💎 النظام يعمل بـ {len(running_clients)} وحدة.")
         await asyncio.gather(*[cl.run_until_disconnected() for cl in running_clients])
+    else:
+        logger.error("❌ لا توجد وحدات عاملة. انتظر حتى يتم التنصيب بشكل صحيح.")
 
-# ------------------------------------------
+# -------------------------------------------------------------------
 # 10. نقطة الدخول
-# ------------------------------------------
+# -------------------------------------------------------------------
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
+    except KeyboardInterrupt:
+        print("🛑 تم إيقاف السورس يدويًا.")
+    except SystemExit:
         pass
+    except Exception as e:
+        logger.critical(f"🔥 خطير: {e}")
