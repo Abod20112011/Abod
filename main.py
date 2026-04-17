@@ -4,7 +4,7 @@ from telethon.sessions import StringSession
 from telethon.tl.functions.channels import JoinChannelRequest
 
 # --- [ نظام سجل الأخطاء المطور ] ---
-LOG_FILENAME = "سجل الأخطاء. aBooD.txt"
+LOG_FILENAME = "سجل الأخطاء.txt"
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
