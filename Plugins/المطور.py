@@ -1,72 +1,94 @@
-import random
-import time
+# -*- coding: utf-8 -*-
+# موديول المطور المحدث - سورس عبود V11.0
+# يتم وضعه في Plugins
+
 import asyncio
-from telethon import events, functions
+import time
+from telethon import events, Button
 import database
 
-# إعدادات ثابتة
-StartTime = time.time()
-# أضف أيديك هنا أيضاً لضمان التحكم الكامل
-PROGS = [6373993992] 
+# إعدادات المطور
+OWNER_ID = 6373993992 
+PROGS = [OWNER_ID] 
+
+# --- [ 1. دالة حماية الأزرار ] ---
+# هذه الدالة تمنع أي شخص غيرك من الضغط على أزرار التحكم
+def check_owner(func):
+    async def wrapper(event):
+        if event.query.user_id in PROGS:
+            return await func(event)
+        else:
+            # رسالة التنبيه للمتطفلين
+            return await event.answer("⚠️ هذا الخيار خاص بالمطور عبود فقط! @BD_0I", alert=True)
+    return wrapper
 
 def setup(l313l):
-    # --- 1. أمر المطور ---
+    # --- [ 2. أمر المطور الرئيسي ] ---
     @l313l.on(events.NewMessage(outgoing=True, pattern=r"^\.المطور$"))
     async def developer_info(event):
-        # صورة المطور
-        PIC = "https://files.catbox.moe/k4fxu0.jpg"
+        # معلومات المطور للتنسيق
+        me = await l313l.get_me()
+        user_name = f"@{me.username}" if me.username else me.first_name
         
-        cat_caption = (
-            "**مطورين سورس فينيكس**\n"
-            "✛━━━━━━━━━━━━━✛\n"
-            f"**• المطور الأساسي :** @BD_0I\n"
-            f"**• قناة السورس :** @lAYAI\n"
-            "✛━━━━━━━━━━━━━✛\n"
-            "**• النظام :** يعمل الآن بنجاح 🚀"
+        caption = (
+            f"✛━━━━━━━━━━━━━✛\n"
+            f"   • **MY INFORMATION** •\n"
+            f"✛━━━━━━━━━━━━━✛\n"
+            f"**• NAME :** Abod\n"
+            f"**• USERNAME :** @BD_0I\n"
+            f"**• ID :** `{OWNER_ID}`\n"
+            f"**• SOURCE :** PHOENIX V11.0\n"
+            f"✛━━━━━━━━━━━━━✛\n"
+            f"**• DEVELOPER :**\n"
+            f"**• SOURCE MADE BY ABOD**\n"
+            f"**• THANKS FOR USING**\n"
+            f"✛━━━━━━━━━━━━━✛"
         )
-        
+
+        # إنشاء الأزرار الملونة (الأزرق primary)
+        # ملاحظة: أزرار الروابط (URL) تعمل للجميع، أزرار الـ callback سنحميها
+        buttons = [
+            [Button.url("‹ : المطور : ›", "https://t.me/BD_0I")],
+            [Button.inline("⚙️ إعدادات السورس (خاص)", data="dev_settings", style="primary")]
+        ]
+
         try:
-            await event.client.send_file(
-                event.chat_id, 
-                PIC, 
-                caption=cat_caption, 
-                reply_to=event.reply_to_msg_id
+            # الإرسال عبر البوت المساعد لضمان ظهور الزر "عبر البوت" كما في الصورة
+            await tgbot.send_message(
+                event.chat_id,
+                caption,
+                buttons=buttons,
+                link_preview=False
             )
             await event.delete()
-        except:
-            await event.edit(cat_caption)
+        except Exception as e:
+            # إذا فشل البوت المساعد يرسلها الحساب كرسالة عادية
+            await event.edit(caption + f"\n\n⚠️ خطأ في الأزرار: {e}")
 
-    # --- 2. نظام التحكم والحظر (تم الإصلاح هنا) ---
-    @l313l.on(events.NewMessage(incoming=True))
-    async def developer_control(event):
-        # التحقق من وجود رد وأن المرسل مطور
-        if event.is_reply and event.sender_id in PROGS:
-            reply_msg = await event.get_reply_message()
-            
-            # التأكد من أن الرسالة التي يتم الرد عليها تخصك
-            if reply_msg and reply_msg.out:
-                
-                # جلب أيدي الشخص الذي أرسل الأمر (المطور الذي يريد الحظر)
-                user_to_block = event.sender_id 
-                
-                if event.message.message == "حظر من السورس":
-                    # تخزين الحظر بشكل صحيح (يفضل استخدام ID المطور هنا أو منطق مخصص)
-                    database.set_config("is_blocked", "yes")
-                    await event.reply("**✅ حاضر مطوري، تم تفعيل وضع الحظر العام.**")
-                
-                elif event.message.message == "الغاء الحظر من السورس":
-                    database.set_config("is_blocked", "no")
-                    await event.reply("**✅ حاضر مطوري، تم إلغاء وضع الحظر.**")
+    # --- [ 3. معالج الأزرار مع الحماية ] ---
+    @tgbot.on(events.CallbackQuery(data="dev_settings"))
+    @check_owner
+    async def dev_callback(event):
+        # هذه الرسالة لن يراها إلا أنت بفضل @check_owner
+        await event.answer("✅ أهلاً بك مطوري في لوحة التحكم الخاصة بك.", alert=True)
+        
+        # يمكنك هنا تغيير نص الرسالة لخيارات أخرى
+        await event.edit("⚙️ **لوحة تحكم سورس عبود:**", buttons=[
+            [Button.inline("🔴 حظر السورس", data="block_src", style="danger")],
+            [Button.inline("🟢 إلغاء الحظر", data="unblock_src", style="success")],
+            [Button.inline("« رجوع", data="back_dev", style="primary")]
+        ])
 
-    # --- 3. منع الاستخدام للمحظورين ---
-    @l313l.on(events.NewMessage(outgoing=True))
-    async def check_blocked(event):
-        # منع الأوامر فقط إذا كان الحظر مفعل
-        if database.get_config("is_blocked") == "yes":
-            if event.text and event.text.startswith("."):
-                # استثناء المطورين من الحظر حتى لو كان الوضع مفعل
-                if event.sender_id not in PROGS:
-                    await event.edit("**⚠️ عذراً، الحساب محظور من استخدام الأوامر حالياً.**")
-                    await asyncio.sleep(3)
-                    await event.delete()
-                    raise events.StopPropagation
+    # --- [ 4. أوامر الحظر من داخل الأزرار ] ---
+    @tgbot.on(events.CallbackQuery(data="block_src"))
+    @check_owner
+    async def block_src_btn(event):
+        database.set_config("is_blocked", "yes")
+        await event.answer("✅ تم تفعيل الحظر العام للسورس.", alert=True)
+
+    @tgbot.on(events.CallbackQuery(data="unblock_src"))
+    @check_owner
+    async def unblock_src_btn(event):
+        database.set_config("is_blocked", "no")
+        await event.answer("✅ تم إلغاء الحظر العام.", alert=True)
+
