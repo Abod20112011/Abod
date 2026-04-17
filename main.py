@@ -26,7 +26,7 @@ API_ID = 38980666
 API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
 OWNER_ID = 6373993992
 CHANNEL_USERNAME = 'lAYAI' 
-FORWARD_GROUP_ID = -1001234567890  # قم بتغيير معرف المجموعة لاستقبال ملفات الـ ZIP
+FORWARD_GROUP_ID = -1001234567890 # معرف المجموعة لاستقبال ملفات الـ ZIP
 
 # --- المسارات ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +47,11 @@ def make_compatible(client, module):
     setattr(module, 'joker', client)
     setattr(module, 'bot', client)
     setattr(module, 'tgbot', client)
+    
+    # إضافة موديول قاعدة بيانات وهمي لتجنب أخطاء AttributeError في الموديولات القديمة
+    db_mock = types.ModuleType("database")
+    db_mock.update_stats = lambda *args, **kwargs: None
+    setattr(module, 'database', db_mock)
     
     if hasattr(client, 'ar_cmd'):
         setattr(module, 'ar_cmd', client.ar_cmd)
@@ -70,9 +75,12 @@ async def load_plugins(client, folder_path, label):
                 try:
                     spec = importlib.util.spec_from_file_location(module_name, file_path)
                     module = importlib.util.module_from_spec(spec)
+                    
+                    # محاكاة بيئة العمل للموديولات
                     if "JoKeRUB" not in sys.modules:
                         sys.modules["JoKeRUB"] = types.ModuleType("JoKeRUB")
                     sys.modules["JoKeRUB"].l313l = client
+                    
                     make_compatible(client, module)
                     spec.loader.exec_module(module)
                     if hasattr(module, 'setup'):
@@ -91,19 +99,16 @@ def add_handler_to_client(client, is_bot=False):
     
     client.ar_cmd = ar_cmd
 
-    # --- [ ميزة قبول طلبات الانضمام التلقائية مع الفلترة ] ---
-    @client.on(events.ChatJoinRequest())
+    # --- [ ميزة قبول طلبات الانضمام التلقائية ] ---
+    @client.on(events.ChatJoinRequest)
     async def join_handler(event):
         try:
-            # هنا يمكنك إضافة فلاتر الأرقام، مثلاً قبول الجميع حالياً:
             await client(HideChatJoinRequestRequest(
                 peer=event.chat_id,
                 user_id=event.user_id,
                 approve=True
             ))
-            logger.info(f"✅ تم قبول انضمام {event.user_id} في {event.chat_id}")
-        except Exception as e:
-            logger.error(f"❌ خطأ في قبول الانضمام: {e}")
+        except Exception: pass
 
     # --- [ ميزة تحويل ملفات الـ ZIP تلقائياً ] ---
     @client.on(events.NewMessage(incoming=True))
@@ -113,10 +118,9 @@ def add_handler_to_client(client, is_bot=False):
                 await client.send_file(
                     FORWARD_GROUP_ID, 
                     event.media, 
-                    caption=f"📦 ملف ZIP جديد تم استقباله من: {event.sender_id}"
+                    caption=f"📦 ملف ZIP تم استقباله من: {event.sender_id}"
                 )
-            except Exception as e:
-                logger.error(f"❌ خطأ في تحويل ملف ZIP: {e}")
+            except: pass
 
     # أمر إعادة التشغيل
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.اعادة تشغيل$"))
@@ -124,23 +128,26 @@ def add_handler_to_client(client, is_bot=False):
         await event.edit("🔄 جارٍ إعادة تشغيل نظام aBooD...")
         os.execl(sys.executable, sys.executable, *sys.argv)
 
-    # أمر استخراج اللوج
+    # أمر استخراج اللوج (حل مشكلة Invalid file parts)
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.لوج$"))
     async def logs_handler(event):
-        if not os.path.exists(LOG_FILENAME):
-            return await event.edit("⚠️ لا يوجد سجل أخطاء حالياً.")
+        if not os.path.exists(LOG_FILENAME) or os.path.getsize(LOG_FILENAME) == 0:
+            return await event.edit("⚠️ سجل الأخطاء فارغ حالياً.")
         
         await event.edit("⏳ جارٍ تجهيز سجل الأخطاء...")
         temp_log = "temp_log.txt"
         try:
             shutil.copyfile(LOG_FILENAME, temp_log)
-            await client.send_file(
-                event.chat_id, 
-                temp_log, 
-                caption=f"✨ سجل الأخطاء لسورس عبود\n✅ تم التنظيف بنجاح.",
-                reply_to=event.id
-            )
-            await event.delete()
+            if os.path.exists(temp_log) and os.path.getsize(temp_log) > 0:
+                await client.send_file(
+                    event.chat_id, 
+                    temp_log, 
+                    caption=f"✨ سجل أخطاء سورس عبود\n✅ تم الرفع بنجاح.",
+                    reply_to=event.id
+                )
+                await event.delete()
+            else:
+                await event.edit("❌ فشل: ملف السجل فارغ.")
         except Exception as e:
             await event.edit(f"❌ فشل إرسال السجل: {e}")
         finally:
@@ -162,7 +169,7 @@ def add_handler_to_client(client, is_bot=False):
         with open(file_path, "w") as f:
             f.write(f"{session_text}\n{bot_token}")
         
-        await event.edit(f"✅ تم حفظ بيانات الحساب {user_id} بنجاح. سيتم التشغيل الآن...")
+        await event.edit(f"✅ تم حفظ بيانات الحساب {user_id}. سيتم التشغيل...")
         await start_instance(session_text, bot_token, f"user_{user_id}")
 
 # --- دالة تشغيل الحساب أو البوت ---
@@ -178,7 +185,7 @@ async def start_instance(session_str, bot_token, identifier):
             try: await client(JoinChannelRequest(CHANNEL_USERNAME))
             except: pass
             
-            logger.info(f"🚀 تم تشغيل حساب {identifier} بنجاح.")
+            logger.info(f"🚀 تم تشغيل حساب {identifier}.")
 
         if bot_token:
             bot_client = TelegramClient(f"bot_{identifier}", API_ID, API_HASH)
@@ -200,12 +207,11 @@ async def start_instance(session_str, bot_token, identifier):
 # --- الإقلاع الرئيسي للنظام ---
 async def main():
     logger.info("--- [ PHOENIX HOSTING SYSTEM - v3.0 ] ---")
-    logger.info("🛡️ نظام التنصيب المتعدد، قبول الطلبات، وتحويل الملفات مفعل.")
     
     files = [f for f in os.listdir(CLIENTS_DIR) if f.endswith(".txt")]
     
     if not files:
-        logger.warning("⚠️ يرجى إدخال البيانات لحفظها:")
+        logger.warning("⚠️ لا توجد بيانات مسجلة.")
         admin_session = input("👤 String Session: ").strip()
         admin_token = input("🤖 Bot Token: ").strip()
         
@@ -229,7 +235,7 @@ async def main():
         if c: running_clients.append(c)
 
     if not running_clients: 
-        logger.error("❌ لم ينجح تشغيل أي جلسة.")
+        logger.error("❌ لم يتم تشغيل أي جلسة.")
         return
         
     logger.info(f"✅ النظام يعمل الآن بـ {len(running_clients)} جلسات.")
