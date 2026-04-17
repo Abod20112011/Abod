@@ -1,50 +1,73 @@
 # -*- coding: utf-8 -*-
-# Plugins/colored_buttons.py
-# أمر .ازرار - يرسل أزراراً ملونة عبر البوت المساعد
+# Plugins/developer.py
+# أمر .المطور مع زر أزرق يوجه لحساب المطور
 
-import json
-import requests
-from telethon import events
+import random
+import time
+from telethon import events, types
+from telethon.tl.functions.users import GetFullUserRequest
+from ..helpers.utils import reply_id
+from . import mention
+
+plugin_category = "utils"
+
+# بيانات المطور (عدلها حسب حسابك)
+OWNER_USERNAME = "BD_0I"        # بدون @
+OWNER_ID = 6373993992           # آيديك
+PIC_URLS = ["https://files.catbox.moe/k4fxu0.jpg"]  # قائمة صور
 
 def setup(client):
-    # الحصول على دوال القاعدة من الكائن المحقون 'database'
-    database = getattr(client, 'database', None)
-    if database:
-        get_config = database.get_config
-    else:
-        # احتياط في حال عدم وجود الحقن
-        def get_config(key): return None
+    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.المطور$"))
+    async def developer_cmd(event):
+        reply_to = await reply_id(event)
 
-    @client.on(events.NewMessage(outgoing=True, pattern=r"^\.ازرار$"))
-    async def colored_buttons_cmd(event):
-        chat_id = event.chat_id
-        token = get_config("TOKEN")
-        if not token:
-            await event.edit("❌ التوكن غير موجود في القاعدة.")
-            return
-
-        text = (
-            "✨ <b>مرحباً بك في نظام الأزرار الملونة!</b>\n"
-            "اختر أحد الأزرار أدناه:"
-        )
-        buttons = [
-            [{"text": "🔵 زر أزرق (primary)", "callback_data": "btn_primary", "style": "primary"}],
-            [{"text": "🟢 زر أخضر (success)", "callback_data": "btn_success", "style": "success"}],
-            [{"text": "🔴 زر أحمر (danger)", "callback_data": "btn_danger", "style": "danger"}]
-        ]
-
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": text,
-            "reply_markup": json.dumps({"inline_keyboard": buttons}),
-            "parse_mode": "HTML"
-        }
+        # جلب اسم المطور من حسابه
         try:
-            resp = requests.post(url, json=payload, timeout=5)
-            if resp.status_code == 200:
-                await event.delete()
-            else:
-                await event.edit(f"⚠️ فشل الإرسال: {resp.text}")
+            full = await client(GetFullUserRequest(OWNER_ID))
+            owner_name = full.users[0].first_name or "المطور"
+        except:
+            owner_name = "المطور"
+
+        # اختيار صورة عشوائية
+        pic = random.choice(PIC_URLS)
+
+        # نص الرسالة
+        caption = (
+            "**مطورين سورس فينيكس**\n"
+            "✛━━━━━━━━━━━━━✛\n"
+            f"**• المطور الأساسي :** @{OWNER_USERNAME}\n"
+            f"**• قناة السورس :** @lAYAI\n"
+            "✛━━━━━━━━━━━━━✛\n"
+            "**• النظام :** يعمل الآن بنجاح 🚀"
+        )
+
+        # بناء زر أزرق (primary) مع رابط حساب المطور
+        dev_button = types.KeyboardButtonUrl(
+            text=f"👨‍💻 المطور: {owner_name}",
+            url=f"https://t.me/{OWNER_USERNAME}",
+            color=1   # 1 = primary (أزرق)
+        )
+        inline_markup = types.ReplyInlineMarkup(
+            rows=[types.KeyboardButtonRow(buttons=[dev_button])]
+        )
+
+        # إرسال الصورة مع الزر
+        try:
+            await client.send_file(
+                event.chat_id,
+                file=pic,
+                caption=caption,
+                buttons=inline_markup,
+                reply_to=reply_to
+            )
         except Exception as e:
-            await event.edit(f"❌ خطأ: {e}")
+            # في حال فشل الصورة، نرسل رسالة نصية مع الزر
+            await client.send_message(
+                event.chat_id,
+                caption,
+                buttons=inline_markup,
+                reply_to=reply_to
+            )
+
+        # حذف أمر .المطور (اختياري)
+        await event.delete()
