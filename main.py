@@ -22,7 +22,7 @@ from sqlalchemy import create_engine, Column, String, BigInteger, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# إعداد قاعدة البيانات (تستخدم SQLite افتراضياً لضمان العمل في تيرمكس والهوست)
+# إعداد قاعدة البيانات (تستخدم SQLite لضمان عدم ضياع الجلسة والتوكن)
 DB_URL = os.getenv("DATABASE_URL", "sqlite:///phoenix.db")
 engine = create_engine(DB_URL)
 Session = sessionmaker(bind=engine)
@@ -157,7 +157,6 @@ def update_reqs():
     print("🛠️ جاري فحص وتحديث مكاتب عبود المطور...")
     libs = ["telethon==1.31.0", "sqlalchemy", "requests", "pydantic", "aiohttp", "pytz", "bs4"]
     try:
-        # استخدام subprocess لضمان التحديث في بيئات العمل المختلفة
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade"] + libs)
         print("✅ تم تحديث المكاتب بنجاح.")
     except Exception as e:
@@ -192,7 +191,7 @@ API_HASH = '561ff5b4953d95c485b17a0bcb121f9c'
 OWNER_ID = 6373993992 
 
 PLUGINS_DIR = "Plugins"
-ASSISTANT_DIR = os.path.join(PLUGINS_DIR, "assistant")
+ASSISTANT_DIR = "assistant" # تعديل: المجلد الآن خارج ملف الاضافات كما طلبت
 
 # إنشاء هيكلة المجلدات المطلوبة
 def check_folders():
@@ -223,10 +222,6 @@ async def load_all_plugins(client, folder, label):
     if folder not in sys.path: sys.path.append(folder)
 
     for root, _, files in os.walk(folder):
-        # ميزة الفرز: موديولات البوت المساعد لا تختلط بموديولات الحساب
-        if "assistant" in root and label != "ASSISTANT":
-            continue
-            
         for file in files:
             if file.endswith(".py") and not file.startswith("__"):
                 path = os.path.join(root, file)
@@ -250,7 +245,6 @@ async def load_all_plugins(client, folder, label):
 async def bot_father_automation(client, bot_token):
     """ضبط وضع الأونلاين والأوامر في BotFather مع حماية من الفلود"""
     try:
-        # جلب يوزر البوت أولاً
         temp = TelegramClient(StringSession(), API_ID, API_HASH)
         await temp.start(bot_token=bot_token)
         me = await temp.get_me()
@@ -260,7 +254,6 @@ async def bot_father_automation(client, bot_token):
         logger.info(f"⚙️ جاري ضبط بيانات {bot_user} عبر BotFather...")
         
         async with client.conversation("@BotFather") as conv:
-            # تفعيل وضع الأونلاين (Inline Mode)
             await conv.send_message("/setinline")
             await asyncio.sleep(2)
             await conv.send_message(bot_user)
@@ -268,20 +261,18 @@ async def bot_father_automation(client, bot_token):
             await conv.send_message("عبود 🩵") 
             await asyncio.sleep(2)
             
-            # ضبط قائمة الأوامر المخصصة
             await conv.send_message("/setcommands")
             await asyncio.sleep(2)
             await conv.send_message(bot_user)
             await asyncio.sleep(2)
             
-            # الاختصارات التي طلبها عبود
             commands = "start - للبدء\nhack - قسم أمر الهـاك"
             await conv.send_message(commands)
             await asyncio.sleep(2)
             
         logger.info(f"✅ تم تفعيل ميزات الأونلاين والأوامر لـ {bot_user}")
     except Exception as e:
-        logger.error(f"⚠️ تنبيه: فشل ضبط BotFather تلقائياً (قد يكون بسبب قيود تيليجرام): {e}")
+        logger.error(f"⚠️ تنبيه: فشل ضبط BotFather تلقائياً: {e}")
 
 # --- [ 5. الأوامر الأساسية للتحكم بالسورس ] ---
 
@@ -293,7 +284,6 @@ def setup_core_cmds(client, is_bot=False):
             pattern = f"^\\.{pattern}"
         return client.on(events.NewMessage(outgoing=not is_bot, pattern=pattern, **kwargs))
     
-    # حقن دالة الأوامر في الكلاينت لسهولة الاستخدام
     client.ar_cmd = ar_cmd
 
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.تنصيب (.*)$"))
@@ -351,21 +341,20 @@ def setup_core_cmds(client, is_bot=False):
 async def run_abood_instance(s_str, t_str):
     """بدء تشغيل الحساب الرئيسي والبوت المساعد معاً"""
     try:
-        # أ: تشغيل حساب المستخدم (Userbot)
+        # أ: تشغيل حساب المستخدم (Userbot) من مجلد Plugins
         main_cl = TelegramClient(StringSession(s_str), API_ID, API_HASH)
         await main_cl.start()
         setup_core_cmds(main_cl)
         await load_all_plugins(main_cl, PLUGINS_DIR, "MAIN")
         clients.append(main_cl)
 
-        # ب: تشغيل البوت المساعد (Assistant Bot)
+        # ب: تشغيل البوت المساعد (Assistant Bot) من مجلد assistant
         bot_cl = TelegramClient("assistant_session", API_ID, API_HASH)
         await bot_cl.start(bot_token=t_str)
         setup_core_cmds(bot_cl, is_bot=True)
         await load_all_plugins(bot_cl, ASSISTANT_DIR, "ASSISTANT")
         clients.append(bot_cl)
 
-        # ج: تفعيل ميزات BotFather في الخلفية
         asyncio.create_task(bot_father_automation(main_cl, t_str))
         
         logger.info("💎 النظام يعمل الآن بكافة طاقته. لا تقلق يا عبود!")
@@ -378,13 +367,11 @@ async def main():
     print("      S O U R C E   A B O O D   V 1 1 . 0      ")
     print("="*50 + "\n")
     
-    # محاولة جلب البيانات من قاعدة البيانات (لضمان الاستمرارية)
     s = get_config("SESSION")
     t = get_config("TOKEN")
 
     if not s or not t:
         print("👤 مرحباً عبود، يبدو أن البيانات غير موجودة في القاعدة.")
-        print("يرجى إدخالها الآن وسيتم حفظها للأبد:")
         s_in = input("🆔 أدخل الجلسة (String Session): ").strip()
         t_in = input("🤖 أدخل توكن البوت (Bot Token): ").strip()
         
@@ -397,25 +384,20 @@ async def main():
             print("❌ خطأ: البيانات مطلوبة للتشغيل!")
             return
 
-    # التحديث التلقائي للمكاتب عند كل إقلاع لضمان عدم وجود أخطاء
+    # التحديث التلقائي للمكاتب عند كل إقلاع
     update_reqs()
     
-    # بدء العمليات
     await run_abood_instance(s, t)
     
-    # الحفاظ على السورس يعمل بشكل مستمر
     if clients:
         await asyncio.gather(*[c.run_until_disconnected() for c in clients])
 
 if __name__ == "__main__":
-    # معالجة استثناءات الإغلاق المفاجئ
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        logger.info("👋 تم إيقاف السورس يدوياً. إلى اللقاء!")
+        logger.info("👋 تم إيقاف السورس يدوياً.")
     except Exception as fatal:
-        logger.critical(f"🛑 خطأ غير متوقع أدى لتوقف السورس: {fatal}")
+        logger.critical(f"🛑 خطأ: {fatal}")
 
-# --- نهاية الكود المطور بـ 360+ سطر ---
-# عبود، هذا الكود يحفظ الجلسة والتوكن في ملف phoenix.db
-# ولن يطلبهما منك مرة أخرى حتى لو قمت بتحديث المكاتب أو إعادة التشغيل.
+# نهاية الكود المطور
