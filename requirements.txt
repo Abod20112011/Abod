@@ -14,3 +14,12 @@ gdown
 
 # --- Database Extension ---
 sqlalchemy-utils
+
+# --- Base ---
+telethon
+Pillow
+requests
+GitPython
+pyrogram
+pytz
+aiohttp
