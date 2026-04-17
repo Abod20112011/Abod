@@ -5,7 +5,7 @@ from telethon import events
 from JoKeRUB import l313l # استيراد المحرك الأساسي
 
 # --- إعدادات افتراضية لـ aBooD ---
-DEFAULT_PING_IMG = "https://files.catbox.moe/z46y7v.jpg"
+DEFAULT_PING_IMG = "https://graph.org/file/26ece5eed6b56c5ba671f-fa81fdea5124cb7cb2.jpg"
 DEFAULT_PING_TEXT = "**[ 𝗜 𝗝𝘂𝘀𝘁 𝗔𝘀𝗸𝗲𝗱 𝗙𝗼𝗿 𝗦𝗼𝗺𝗲 𝗣𝗲𝗮𝗰𝗲 . ](t.me/BD_0I)**"
 TEMP = """{PING_TEXT}
 ┏━━━━━━━┓
