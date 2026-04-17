@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 # Plugins/developer.py
-# أمر .المطور يرسل رسالة عبر البوت المساعد لتحتوي على أزرار ملونة
+# أمر .المطور يرسل رسالة عبر البوت المساعد مع أزرار ملونة
 
+import json
 import random
 import requests
 from telethon import events
 
-# --- إعدادات ---
+# --- الإعدادات (عدلها حسب معلوماتك) ---
 OWNER_USERNAME = "BD_0I"        # بدون @
 OWNER_ID = 6373993992           # آيديك
 PIC_URLS = ["https://files.catbox.moe/k4fxu0.jpg"]
-# --------------
+# -----------------------------------------
 
 def setup(client):
     @client.on(events.NewMessage(outgoing=True, pattern=r"^\.المطور$"))
@@ -42,38 +43,38 @@ def setup(client):
             "**• النظام :** يعمل الآن بنجاح 🚀"
         )
 
-        # 4. بناء الزر الملون (أزرق)
-        # هذه هي الطريقة الصحيحة لبناء الأزرار الملونة عبر Bot API
+        # 4. بناء الأزرار الملونة
         keyboard = {
             "inline_keyboard": [
                 [{
                     "text": f"👨‍💻 المطور: {owner_name}",
                     "url": f"https://t.me/{OWNER_USERNAME}",
-                    "style": "primary"  # ✅ هذا هو اللون الأزرق (primary)
+                    "style": "primary"   # أزرق
+                }],
+                [{
+                    "text": "📢 قناة السورس",
+                    "url": "https://t.me/lAYAI",
+                    "style": "success"   # أخضر
                 }]
             ]
         }
 
-        # 5. إرسال الرسالة عبر البوت المساعد
-        # نستخدم requests مباشرة لإرسال صورة مع زر عبر Bot API
+        # 5. إرسال الصورة مع الأزرار عبر البوت المساعد
         url = f"https://api.telegram.org/bot{token}/sendPhoto"
         payload = {
             "chat_id": chat_id,
             "photo": pic,
             "caption": caption,
             "reply_to_message_id": reply_to,
-            "reply_markup": json.dumps(keyboard) # تحويل الـ keyboard إلى JSON
+            "reply_markup": json.dumps(keyboard),
+            "parse_mode": "Markdown"
         }
 
         try:
-            # إرسال الصورة عبر البوت
             response = requests.post(url, data=payload).json()
             if response.get("ok"):
-                await event.delete() # حذف أمر .المطور بعد نجاح الإرسال
+                await event.delete()
             else:
                 await event.edit(f"⚠️ فشل الإرسال: {response.get('description')}")
         except Exception as e:
             await event.edit(f"❌ حدث خطأ: {e}")
-
-# لا تنسى استيراد json في أعلى الملف إذا لم يكن موجودًا
-import json
