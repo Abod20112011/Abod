@@ -1,0 +1,16 @@
+# --- Speed & Performance ---
+cryptg
+tgcrypto
+uvloop; sys_platform != 'win32'
+
+# --- Task Scheduling ---
+apscheduler
+
+# --- System & Utilities ---
+colorama
+pydantic
+speedtest-cli
+gdown
+
+# --- Database Extension ---
+sqlalchemy-utils
